@@ -23,6 +23,11 @@ const MATRIX: Record<Capability, Role[]> = {
   "users.manage": ["SUPER_ADMIN", "ADMINISTRATOR"],
   "audit.view": ["SUPER_ADMIN", "ADMINISTRATOR"],
   "dsr.erase": ["SUPER_ADMIN"],
+  "payments.offline": ["SUPER_ADMIN", "ADMINISTRATOR"],
+  "referrals.approve": ["SUPER_ADMIN", "ADMINISTRATOR"],
+  "buyers.manage": ["SUPER_ADMIN", "ADMINISTRATOR"],
+  "buyers.view": ["SUPER_ADMIN", "ADMINISTRATOR", "ADVISOR"],
+  "reports.view": ["SUPER_ADMIN", "ADMINISTRATOR", "VIEWER"],
 };
 const ROLES: Role[] = ["SUPER_ADMIN", "ADMINISTRATOR", "EDITOR", "ADVISOR", "VIEWER"];
 

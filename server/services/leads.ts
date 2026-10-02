@@ -13,6 +13,7 @@ import { getSettings } from "./settings";
 import { enqueue } from "./notifications";
 import { hitRateLimit, LIMITS } from "./rate-limit";
 import { audit } from "./audit";
+import { afterLeadSaved } from "./assignment";
 import type { Actor, RequestCtx } from "./actor";
 
 export const DUPLICATE_WINDOW_DAYS = 30;
@@ -67,6 +68,10 @@ interface LeadFields {
   utm?: Record<string, string>;
   idempotencyKey?: string;
   status?: LeadStatus;
+  callbackWindow?: string;
+  whatsappOptIn?: boolean;
+  referralCode?: string | null;
+  partial?: boolean;
 }
 
 /** Create or merge a lead inside a transaction. Returns the lead row. */
@@ -117,6 +122,9 @@ async function upsertLead(tx: Tx, f: LeadFields, ctx: Required<Pick<RequestCtx, 
         marketingConsent: existing.marketingConsent || Boolean(f.marketingConsent),
         status: f.status && existing.status === "NEW" ? f.status : existing.status,
         readAt: null,
+        isPartial: f.partial ? existing.isPartial : false,
+        callbackWindow: f.callbackWindow || existing.callbackWindow,
+        whatsappOptIn: existing.whatsappOptIn || Boolean(f.whatsappOptIn),
       },
     });
     await tx.leadActivity.create({ data: { leadId: lead.id, type: "enquiry", payload: answers, createdAt: now } });
@@ -146,6 +154,10 @@ async function upsertLead(tx: Tx, f: LeadFields, ctx: Required<Pick<RequestCtx, 
       deviceClass: deviceClass(ctx.userAgent),
       marketingConsent: Boolean(f.marketingConsent),
       disposableEmail: email ? isDisposableEmail(email) : false,
+      isPartial: Boolean(f.partial),
+      callbackWindow: f.callbackWindow || null,
+      whatsappOptIn: Boolean(f.whatsappOptIn),
+      referralCode: f.referralCode ?? null,
       createdAt: now,
     },
   });
@@ -203,13 +215,51 @@ async function submit(fields: LeadFields, ctx: RequestCtx, extra?: (tx: Tx, lead
   });
 
   // Notifications are queued only after the lead is committed (NFR-AVAIL-005).
-  if (!result.duplicateSubmit) {
+  // Partial leads (abandoned forms) are followed up by advisors, not auto-emailed.
+  if (!result.duplicateSubmit && !fields.partial) {
     const b = brief(fields, result.lead.reference);
     const email = normaliseEmail(fields.email);
     if (email) await enqueue({ channel: "email", to: email, template: "lead.received", payload: b, leadId: result.lead.id });
     await enqueue({ channel: "email", to: settings.advisorEmails[advisorGroup(fields)], template: "lead.internal", payload: { ...b, merged: result.merged }, leadId: result.lead.id });
   }
+  if (!result.duplicateSubmit) {
+    // Phase 2/3 follow-ups (scoring, assignment, SLA, referral) never block or lose the lead.
+    try {
+      await afterLeadSaved(result.lead.id, { isNew: !result.merged, now, referralCode: fields.referralCode ?? null });
+    } catch (e) {
+      console.error("lead-followup-failed", e instanceof Error ? e.message : e);
+    }
+  }
   return { ok: true, reference: result.lead.reference, merged: result.merged, firstName: fields.name.split(/\s+/)[0] };
+}
+
+/** An abandoned advisor form where contact details were already given (FR-LEAD-007). */
+export async function createPartialLead(input: { name: string; phone?: string; email?: string; answers?: Record<string, unknown>; website?: string; referralCode?: string | null }, ctx: RequestCtx = {}): Promise<SubmitResult> {
+  const now = ctx.now ?? new Date();
+  if (input.website) return REJECTED;
+  const name = (input.name ?? "").trim().slice(0, 120);
+  const phone = normalisePhone(input.phone);
+  const email = normaliseEmail(input.email);
+  if (!name || (!phone && !email)) return { ok: false, status: 422, message: "Name and a phone or email are needed.", field: "phone" };
+  if (!(await hitRateLimit(`lead:${ctx.ip ?? "unknown"}`, LIMITS.lead.limit, LIMITS.lead.window, now))) return RATE_LIMITED;
+  const a = input.answers ?? {};
+  const str = (v: unknown) => (typeof v === "string" ? v.slice(0, 120) : undefined);
+  return submit(
+    {
+      source: "advisor-partial",
+      partial: true,
+      name,
+      phone: input.phone,
+      email: input.email,
+      objective: str(a.objective),
+      corridors: Array.isArray(a.corridors) ? (a.corridors as unknown[]).filter((c): c is string => typeof c === "string").slice(0, 10) : [],
+      budgetBand: str(a.budgetBand),
+      timeline: str(a.timeline),
+      residency: str(a.residency),
+      referralCode: input.referralCode,
+    },
+    { ...ctx, now },
+  );
 }
 
 export async function createLead(input: unknown, ctx: RequestCtx = {}): Promise<SubmitResult> {
@@ -257,7 +307,7 @@ export async function createBooking(input: unknown, ctx: RequestCtx = {}): Promi
   let bookingRef = "";
   const property = d.propertySlug ? await db.property.findUnique({ where: { slug: d.propertySlug } }) : null;
   const r = await submit(
-    { source: "booking", name: d.name, phone: d.phone, propertySlug: d.propertySlug, marketingConsent: d.marketingConsent, pagePath: d.pagePath, landingPath: d.landingPath, referrer: d.referrer, utm: d.utm, idempotencyKey: d.idempotencyKey, status: "BOOKED_INSPECTION" },
+    { source: "booking", name: d.name, phone: d.phone, propertySlug: d.propertySlug, marketingConsent: d.marketingConsent, pagePath: d.pagePath, landingPath: d.landingPath, referrer: d.referrer, utm: d.utm, idempotencyKey: d.idempotencyKey, status: "BOOKED_INSPECTION", whatsappOptIn: d.whatsappOptIn, referralCode: d.referralCode },
     { ...ctx, now },
     async (tx, leadId) => {
       bookingRef = await newReference(tx, "BK", Number(now.toISOString().slice(0, 4)));

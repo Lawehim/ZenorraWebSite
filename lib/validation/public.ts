@@ -39,6 +39,9 @@ export const leadInputSchema = z
     landingPath: optionalText(300),
     referrer: optionalText(500),
     utm: z.record(z.string(), z.string().max(200)).optional(),
+    callbackWindow: optionalText(60),
+    whatsappOptIn: z.boolean().optional().default(false),
+    referralCode: optionalText(12),
     idempotencyKey: optionalText(64),
     website: honeypot,
   })
@@ -62,6 +65,9 @@ export const bookingInputSchema = z.object({
   landingPath: optionalText(300),
   referrer: optionalText(500),
   utm: z.record(z.string(), z.string().max(200)).optional(),
+  callbackWindow: optionalText(60),
+  whatsappOptIn: z.boolean().optional().default(false),
+  referralCode: optionalText(12),
   idempotencyKey: optionalText(64),
   website: honeypot,
 });
@@ -88,6 +94,9 @@ export const contactInputSchema = z
     landingPath: optionalText(300),
     referrer: optionalText(500),
     utm: z.record(z.string(), z.string().max(200)).optional(),
+    callbackWindow: optionalText(60),
+    whatsappOptIn: z.boolean().optional().default(false),
+    referralCode: optionalText(12),
     idempotencyKey: optionalText(64),
     website: honeypot,
   })
