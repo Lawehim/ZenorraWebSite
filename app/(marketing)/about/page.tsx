@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getAllContent, getContent } from "@/server/services/content";
-import { imageFromUrl } from "@/server/queries/mappers";
+import { imageFromUrl, imageFromAsset } from "@/server/queries/mappers";
+import { db } from "@/lib/db";
 import { assetsByUrl, getSiteChrome } from "@/server/queries/site";
 import { SiteImage } from "@/components/ui/SiteImage";
 import { Button } from "@/components/ui/Button";
@@ -14,7 +15,12 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function AboutPage() {
-  const [c, chrome] = await Promise.all([getAllContent(["about.header", "about.who", "about.missionVision", "about.why", "about.commitment"]), getSiteChrome()]);
+  const [c, chrome, team, partners] = await Promise.all([
+    getAllContent(["about.header", "about.who", "about.missionVision", "about.why", "about.commitment"]),
+    getSiteChrome(),
+    db.teamMember.findMany({ where: { published: true }, orderBy: { order: "asc" }, include: { mediaAsset: true } }),
+    db.partner.findMany({ where: { published: true }, orderBy: { order: "asc" }, include: { mediaAsset: true } }),
+  ]);
   const h = c["about.header"];
   const assets = await assetsByUrl([h.image, c["about.commitment"].image, chrome.content["site.cta"].image]);
   return (
@@ -98,6 +104,46 @@ export default async function AboutPage() {
           </div>
         </div>
       </section>
+      {team.length > 0 && (
+        <section className="sec sec-tight">
+          <div className="wrap">
+            <SectionHead eyebrow="Our team" title="The people you will speak to" />
+            <div className="team">
+              {team.map((m) => (
+                <figure key={m.id}>
+                  <SiteImage image={imageFromAsset(m.mediaAsset, m.name)} brief={`Portrait — ${m.name}`} meta="4:5" ratio="4/5" />
+                  <figcaption>
+                    <b>{m.name}</b>
+                    <span>{m.roleText}</span>
+                    {m.bio && <p className="muted" style={{ fontSize: ".86rem", marginTop: ".5rem" }}>{m.bio}</p>}
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {partners.length > 0 && (
+        <section className="sec sec-tight">
+          <div className="wrap">
+            <SectionHead eyebrow="Partners" title="Developers and solar providers we work with" />
+            <div className="partners">
+              {partners.map((p) => {
+                const inner = p.mediaAsset ? <img src={imageFromAsset(p.mediaAsset, p.name)!.src} alt={p.name} /> : <span style={{ border: 0, padding: 0, minWidth: 0 }}>{p.name}</span>;
+                return p.url ? (
+                  <a key={p.id} href={p.url} target="_blank" rel="noopener noreferrer" title={p.name}>
+                    {inner}
+                  </a>
+                ) : (
+                  <span key={p.id}>{inner}</span>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
+
       <CtaBand copy={chrome.content["site.cta"]} image={imageFromUrl(chrome.content["site.cta"].image, assets)} />
     </>
   );

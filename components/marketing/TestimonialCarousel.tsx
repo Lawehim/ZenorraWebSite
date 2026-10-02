@@ -8,6 +8,14 @@ export interface TestimonialItem {
   roleText: string;
   quote: string;
   initials: string | null;
+  videoUrl?: string | null;
+}
+
+function embedUrl(url: string): string | null {
+  const yt = url.match(/(?:youtu\.be\/|v=|embed\/)([\w-]{11})/);
+  if (yt) return `https://www.youtube-nocookie.com/embed/${yt[1]}?autoplay=1`;
+  const vm = url.match(/vimeo\.com\/(\d+)/);
+  return vm ? `https://player.vimeo.com/video/${vm[1]}?autoplay=1` : null;
 }
 
 /** Auto-advances every 7s; pauses on hover, focus, user request and reduced motion (FR-HOME-011). */
@@ -15,6 +23,7 @@ export function TestimonialCarousel({ items }: { items: TestimonialItem[] }) {
   const [i, setI] = useState(0);
   const [paused, setPaused] = useState(false);
   const [hovering, setHovering] = useState(false);
+  const [playing, setPlaying] = useState<string | null>(null);
   const reduced = usePrefersReducedMotion();
   const n = items.length;
 
@@ -52,6 +61,15 @@ export function TestimonialCarousel({ items }: { items: TestimonialItem[] }) {
                 <span>{t.roleText}</span>
               </div>
             </figcaption>
+            {t.videoUrl && embedUrl(t.videoUrl) && (
+              playing === t.id ? (
+                <iframe className="video-frame" src={embedUrl(t.videoUrl)!} title={`Video testimonial from ${t.name}`} allow="autoplay; encrypted-media; fullscreen" allowFullScreen />
+              ) : (
+                <button type="button" className="btn btn-line btn-sm video-btn" onClick={() => { setPaused(true); setPlaying(t.id); }}>
+                  ▶ Watch {t.name.split(" ")[0]}&apos;s video
+                </button>
+              )
+            )}
           </figure>
         ))}
       </div>

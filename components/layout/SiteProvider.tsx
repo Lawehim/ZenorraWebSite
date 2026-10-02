@@ -4,7 +4,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import type { ContentOf } from "@/lib/content/registry";
-import { captureAttribution } from "@/lib/attribution";
+import { captureAttribution, captureReferral } from "@/lib/attribution";
 import { CORRIDORS } from "@/lib/properties/filters";
 import { Modal } from "@/components/ui/Modal";
 import { AdvisorWizard } from "@/components/forms/AdvisorWizard";
@@ -34,7 +34,13 @@ export function SiteProvider({ advisorCopy, bookingCopy, properties, departurePo
 
   useEffect(() => {
     captureAttribution(window.location, document.referrer);
+    captureReferral(window.location.search);
   }, [pathname]);
+
+  // Offline support (FR-GLOB-009) — production builds only, so development never serves stale pages.
+  useEffect(() => {
+    if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+  }, []);
 
   // Progressive reveal: only hide content once JS is running.
   useEffect(() => {

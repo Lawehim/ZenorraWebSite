@@ -50,8 +50,31 @@ export function readAttribution(): Attribution {
   }
 }
 
-export function formContext(): Attribution & { pagePath: string; idempotencyKey: string } {
+// Referral links (?ref=ZN…) are remembered for 90 days across sessions (FR-REF-002).
+const REF_KEY = "zn.ref";
+const REF_DAYS = 90;
+
+export function captureReferral(search: string, now = Date.now()) {
+  const code = new URLSearchParams(search).get("ref");
+  if (!code || !/^zn[a-z2-9]{6}$/i.test(code.trim())) return;
+  try {
+    localStorage.setItem(REF_KEY, JSON.stringify({ code: code.trim().toUpperCase(), expires: now + REF_DAYS * 86400_000 }));
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+export function readReferral(now = Date.now()): string | undefined {
+  try {
+    const v = JSON.parse(localStorage.getItem(REF_KEY) ?? "null") as { code: string; expires: number } | null;
+    return v && v.expires > now ? v.code : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function formContext(): Attribution & { pagePath: string; idempotencyKey: string; referralCode?: string } {
   const a = readAttribution();
   const key = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Math.random()).slice(2);
-  return { ...a, pagePath: typeof location !== "undefined" ? location.pathname : "", idempotencyKey: key };
+  return { ...a, pagePath: typeof location !== "undefined" ? location.pathname : "", idempotencyKey: key, referralCode: typeof window !== "undefined" ? readReferral() : undefined };
 }

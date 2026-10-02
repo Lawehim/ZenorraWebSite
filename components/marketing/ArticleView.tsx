@@ -15,9 +15,10 @@ export interface ArticleViewProps {
   bodyHtml: string;
   cover: ImageSource | null;
   cta: ContentOf<"insights.articleCta">;
+  share?: React.ReactNode;
 }
 
-export function ArticleView({ title, category, publishedAt, readingMinutes, author, bodyHtml, cover, cta }: ArticleViewProps) {
+export function ArticleView({ title, category, publishedAt, readingMinutes, author, bodyHtml, cover, cta, share }: ArticleViewProps) {
   return (
     <>
       <section className="phead">
@@ -37,6 +38,7 @@ export function ArticleView({ title, category, publishedAt, readingMinutes, auth
               <span>By {author}</span>
             </div>
             <div dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(bodyHtml) }} />
+            {share}
             <div className="panel brackets" style={{ marginTop: "3rem", display: "flex", gap: "1.4rem", alignItems: "center", flexWrap: "wrap", justifyContent: "space-between" }}>
               <div>
                 <h2 style={{ fontSize: "1.25rem", margin: "0 0 .4rem" }}>{cta.headline}</h2>

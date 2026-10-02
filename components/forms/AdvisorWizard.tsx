@@ -59,6 +59,25 @@ export function AdvisorWizard({ copy, corridors, propertySlug, onSubmit }: Advis
   const headingRef = useRef<HTMLDivElement>(null);
   const fieldRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const firstRender = useRef(true);
+  const latest = useRef({ state, contact, done: false as boolean });
+  useEffect(() => {
+    latest.current = { state, contact, done: Boolean(done) };
+  });
+
+  // Closing the form after giving contact details keeps a partial lead for follow-up (FR-LEAD-007).
+  useEffect(
+    () => () => {
+      const { state: st, contact: c, done: d } = latest.current;
+      if (d || st.step < TOTAL_STEPS || !c.name.trim() || !(c.phone.trim() || c.email.trim()) || c.website) return;
+      try {
+        const body = JSON.stringify({ name: c.name, phone: c.phone, email: c.email, answers: st.answers, website: "", referralCode: formContext().referralCode });
+        navigator.sendBeacon?.("/api/leads/partial", new Blob([body], { type: "application/json" }));
+      } catch {
+        /* best effort */
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!done) save(state);

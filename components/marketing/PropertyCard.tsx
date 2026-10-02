@@ -3,6 +3,7 @@ import type { Availability, PropertyStatus } from "@prisma/client";
 import { formatNaira, monthlyInstalment } from "@/lib/format";
 import { SiteImage, type ImageSource } from "@/components/ui/SiteImage";
 import { Icon } from "@/components/ui/Icon";
+import { ShortlistButton } from "./ShortlistButton";
 
 export interface PropertyCardData {
   slug: string;
@@ -36,7 +37,8 @@ export function PropertyCard({ property: p }: PropertyCardProps) {
   const price = BigInt(p.priceNaira);
   const monthly = p.planMonths > 1 ? monthlyInstalment(price, p.depositPercent, p.planMonths) : null;
   return (
-    <Link className="plot rv" href={`/properties/${p.slug}`} data-testid="property-card">
+    <div className="plot-wrap rv">
+    <Link className="plot" href={`/properties/${p.slug}`} data-testid="property-card">
       <div className="plot-art">
         <SiteImage image={p.image} brief={p.heroBrief || "Aerial photograph of the estate"} meta="4:3 · 1200×900 min" sizes="(max-width: 700px) 100vw, 400px" />
         <div className="plot-tags">
@@ -84,5 +86,7 @@ export function PropertyCard({ property: p }: PropertyCardProps) {
         </div>
       </div>
     </Link>
+    <ShortlistButton slug={p.slug} name={p.name} />
+    </div>
   );
 }

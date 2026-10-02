@@ -10,7 +10,7 @@ import { postJson } from "./types";
 const MAX = 2000;
 
 export function ContactForm({ copy }: { copy: ContentOf<"contact.form"> }) {
-  const [v, setV] = useState({ name: "", phone: "", email: "", enquiryType: "property", message: "", website: "" });
+  const [v, setV] = useState({ name: "", phone: "", email: "", enquiryType: "property", message: "", callbackWindow: "", website: "" });
   const [consent, setConsent] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [failure, setFailure] = useState<string | null>(null);
@@ -94,6 +94,17 @@ export function ContactForm({ copy }: { copy: ContentOf<"contact.form"> }) {
                 {t.label}
               </option>
             ))}
+          </select>
+        )}
+      </Field>
+      <Field label="Best time to call back" id="ct-callbackWindow" help="Requests outside office hours are queued for the next working morning.">
+        {(p) => (
+          <select {...p} className="inp" value={v.callbackWindow} onChange={set("callbackWindow")}>
+            <option value="">Any time</option>
+            <option>Morning (9–12)</option>
+            <option>Afternoon (12–4)</option>
+            <option>Evening (4–7)</option>
+            <option>Weekend</option>
           </select>
         )}
       </Field>

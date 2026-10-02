@@ -6,6 +6,7 @@ import { whatsappLink } from "@/lib/whatsapp";
 import { ContactForm } from "@/components/forms/ContactForm";
 import { OpenModalButton } from "@/components/layout/SiteProvider";
 import { PageHeader, Eyebrow } from "@/components/sections";
+import { MapEmbed } from "@/components/marketing/MapEmbed";
 
 export const revalidate = 60;
 
@@ -76,6 +77,9 @@ export default async function ContactPage() {
                     Read our Google reviews
                   </a>
                 )}
+              </div>
+              <div style={{ marginTop: "1.4rem" }}>
+                <MapEmbed query={s.address} label="Zenorra head office" />
               </div>
               <div style={{ display: "flex", gap: ".7rem", marginTop: "1.4rem", flexWrap: "wrap" }}>
                 <OpenModalButton kind="booking" className="btn btn-line btn-sm">
