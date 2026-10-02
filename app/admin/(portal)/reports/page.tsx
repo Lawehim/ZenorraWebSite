@@ -48,6 +48,8 @@ export default async function Reports({ searchParams }: { searchParams: Promise<
   await requirePageUser("reports.view", "/admin/reports");
   const sp = await searchParams;
   const to = sp.to && /^\d{4}-\d{2}-\d{2}$/.test(sp.to) ? sp.to : lagosDateString(new Date());
+  // Per-request server render: reading the clock for the default date range is intended.
+  // eslint-disable-next-line react-hooks/purity
   const from = sp.from && /^\d{4}-\d{2}-\d{2}$/.test(sp.from) ? sp.from : lagosDateString(new Date(Date.now() - 29 * 86400_000));
   const r = await leadsReport({ from: new Date(`${from}T00:00:00+01:00`), to: new Date(`${to}T23:59:59+01:00`) });
   return (

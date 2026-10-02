@@ -46,6 +46,8 @@ export function Footer({ settings, copy }: { settings: SiteSettings; copy: Conte
               <li><OpenModalButton kind="booking" className="">Book an inspection</OpenModalButton></li>
               <li><OpenModalButton kind="advisor" className="">Talk to an advisor</OpenModalButton></li>
               <li><Link href="/insights/avoid-land-scams">Verify a title</Link></li>
+              <li><Link href="/shortlist">My shortlist</Link></li>
+              <li><Link href="/account">Buyer portal</Link></li>
               {settings.googleReviewsUrl && (
                 <li>
                   <a href={settings.googleReviewsUrl} target="_blank" rel="noopener noreferrer">

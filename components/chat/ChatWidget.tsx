@@ -24,7 +24,8 @@ function loadToken() {
 export function ChatWidget() {
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<{ online: boolean; nextOpen: string | null } | null>(null);
-  const [token, setToken] = useState<string | null>(null);
+  // The widget only renders in the browser (dynamic, ssr:false), so session storage is readable at init.
+  const [token, setToken] = useState<string | null>(() => loadToken());
   const [messages, setMessages] = useState<Msg[]>([]);
   const [draft, setDraft] = useState("");
   const [who, setWho] = useState({ name: "", contact: "" });
@@ -33,7 +34,6 @@ export function ChatWidget() {
 
   useEffect(() => {
     if (!open || status) return;
-    setToken(loadToken());
     fetch("/api/chat/status")
       .then((r) => r.json())
       .then(setStatus)
@@ -56,6 +56,8 @@ export function ChatWidget() {
 
   useEffect(() => {
     if (!open || !token) return;
+    // Polling our own chat endpoint is an external-system sync; one immediate fetch is intended.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     poll();
     const t = setInterval(poll, 4000);
     return () => clearInterval(t);

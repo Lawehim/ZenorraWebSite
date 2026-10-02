@@ -88,6 +88,7 @@ const TEMPLATES: Record<string, (p: P) => Rendered> = {
       `Remaining balance: ${s(p.balance)}. Your receipt is in your buyer portal: ${APP_URL()}/account`,
     ]),
   "payment.reminder": (p) => simple(`Payment reminder — ${s(p.label)}`, [`Hello ${s(p.name)},`, `${s(p.label)} for ${s(p.property)} (${s(p.amount)}) is due ${s(p.when)} (${s(p.due)}).`, `Pay securely in your buyer portal: ${APP_URL()}/account`]),
+  "buyer.document": (p) => simple("A new document is in your Zenorra portal", [`Hello ${s(p.name)},`, `“${s(p.title)}” has been added to your document vault.`, `Sign in to view it: ${APP_URL()}/account`]),
   "ticket.new": (p) => simple(`Buyer support request ${s(p.reference)}`, [`New support request: ${s(p.subject)}.`, `${APP_URL()}/admin/tickets`], "Internal notification"),
   "ticket.reply": (p) => simple(`Re: ${s(p.subject)} (${s(p.reference)})`, [s(p.reply), `View in your buyer portal: ${APP_URL()}/account/support`]),
   "referral.qualified": (p) => simple("A referral is ready for payout approval", [`${s(p.referrer)}'s referral (${s(p.purchase)}) has reached the payment threshold.`, `Approve it: ${APP_URL()}/admin/referrals`], "Internal notification"),
