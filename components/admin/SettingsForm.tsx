@@ -95,6 +95,94 @@ export function SettingsForm({ initial }: { initial: SiteSettings }) {
               </Field>
             ))}
           </section>
+          <section className="card" style={{ marginBottom: "1rem" }}>
+            <h2>Assignment &amp; SLA</h2>
+            <Field label="New leads are">
+              {(p) => (
+                <select {...p} className="inp" value={s.assignment.mode} onChange={(e) => setS({ ...s, assignment: { ...s.assignment, mode: e.target.value as "manual" | "round-robin" } })}>
+                  <option value="round-robin">Shared between active advisors in turn</option>
+                  <option value="manual">Left unassigned for an administrator</option>
+                </select>
+              )}
+            </Field>
+            <Field label="First contact within (hours)" error={errors.assignment}>
+              {(p) => <input {...p} className="inp" type="number" min={1} max={168} value={s.assignment.slaHours} onChange={(e) => setS({ ...s, assignment: { ...s.assignment, slaHours: Number(e.target.value) } })} />}
+            </Field>
+          </section>
+          <section className="card" style={{ marginBottom: "1rem" }}>
+            <h2>Live chat hours (WAT)</h2>
+            <div className="two-up">
+              <Field label="Opens" error={errors.officeHours}>
+                {(p) => <input {...p} className="inp" type="time" value={s.officeHours.open} onChange={(e) => setS({ ...s, officeHours: { ...s.officeHours, open: e.target.value } })} />}
+              </Field>
+              <Field label="Closes">{(p) => <input {...p} className="inp" type="time" value={s.officeHours.close} onChange={(e) => setS({ ...s, officeHours: { ...s.officeHours, close: e.target.value } })} />}</Field>
+            </div>
+            <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
+              <legend className="label">Days</legend>
+              {DAYS.map((d, i) => (
+                <label key={d} className="consent" style={{ margin: ".15rem 0" }}>
+                  <input type="checkbox" checked={s.officeHours.days.includes(i)} onChange={(e) => setS({ ...s, officeHours: { ...s.officeHours, days: e.target.checked ? [...s.officeHours.days, i].sort() : s.officeHours.days.filter((x) => x !== i) } })} />
+                  {d}
+                </label>
+              ))}
+            </fieldset>
+          </section>
+          <section className="card" style={{ marginBottom: "1rem" }}>
+            <h2>Daily summary email</h2>
+            <label className="consent">
+              <input type="checkbox" checked={s.digest.enabled} onChange={(e) => setS({ ...s, digest: { ...s.digest, enabled: e.target.checked } })} /> Send a daily summary
+            </label>
+            <Field label="Recipients (comma separated)" error={errors.digest}>
+              {(p) => <input {...p} className="inp" value={s.digest.recipients.join(", ")} onChange={(e) => setS({ ...s, digest: { ...s.digest, recipients: e.target.value.split(",").map((x) => x.trim()).filter(Boolean) } })} />}
+            </Field>
+            <Field label="Send after (hour, WAT)">{(p) => <input {...p} className="inp" type="number" min={0} max={23} value={s.digest.hour} onChange={(e) => setS({ ...s, digest: { ...s.digest, hour: Number(e.target.value) } })} />}</Field>
+          </section>
+          <section className="card" style={{ marginBottom: "1rem" }}>
+            <h2>Indicative currency prices</h2>
+            <label className="consent">
+              <input type="checkbox" checked={s.fx.enabled} onChange={(e) => setS({ ...s, fx: { ...s.fx, enabled: e.target.checked } })} /> Show GBP / USD / CAD next to naira prices
+            </label>
+            <p className="muted" style={{ fontSize: ".8rem", marginBottom: ".6rem" }}>
+              Naira per one unit. Labelled “indicative” with the date; never contractual.
+            </p>
+            <div className="two-up">
+              {(["GBP", "USD", "CAD"] as const).map((c) => (
+                <Field key={c} label={`₦ per ${c}`} error={errors.fx}>
+                  {(p) => <input {...p} className="inp" type="number" min={0} value={s.fx[c]} onChange={(e) => setS({ ...s, fx: { ...s.fx, [c]: Number(e.target.value) } })} />}
+                </Field>
+              ))}
+              <Field label="Rates as of">{(p) => <input {...p} className="inp" type="date" value={s.fx.asOf} onChange={(e) => setS({ ...s, fx: { ...s.fx, asOf: e.target.value } })} />}</Field>
+            </div>
+          </section>
+          <section className="card" style={{ marginBottom: "1rem" }}>
+            <h2>WhatsApp messaging</h2>
+            <label className="consent">
+              <input type="checkbox" checked={s.whatsappMessaging.enabled} onChange={(e) => setS({ ...s, whatsappMessaging: { enabled: e.target.checked } })} /> Send booking confirmations and reminders on WhatsApp to people who opted in
+            </label>
+            <p className="muted" style={{ fontSize: ".8rem" }}>
+              Needs the WhatsApp Cloud API keys and Meta-approved templates (see README).
+            </p>
+          </section>
+          <section className="card" style={{ marginBottom: "1rem" }}>
+            <h2>Referral programme</h2>
+            <label className="consent">
+              <input type="checkbox" checked={s.referrals.enabled} onChange={(e) => setS({ ...s, referrals: { ...s.referrals, enabled: e.target.checked } })} /> Accept referral codes
+            </label>
+            <div className="two-up">
+              <Field label="Payable after buyer has paid (%)" error={errors.referrals}>
+                {(p) => <input {...p} className="inp" type="number" min={1} max={100} value={s.referrals.thresholdPercent} onChange={(e) => setS({ ...s, referrals: { ...s.referrals, thresholdPercent: Number(e.target.value) } })} />}
+              </Field>
+              <Field label="Commission (% of price)">
+                {(p) => <input {...p} className="inp" type="number" min={0} max={20} step={0.25} value={s.referrals.commissionPercent} onChange={(e) => setS({ ...s, referrals: { ...s.referrals, commissionPercent: Number(e.target.value) } })} />}
+              </Field>
+            </div>
+          </section>
+          <section className="card" style={{ marginBottom: "1rem" }}>
+            <h2>Bank transfer details (buyer portal)</h2>
+            <Field label="Bank">{(p) => <input {...p} className="inp" value={s.bankTransfer.bankName} onChange={(e) => setS({ ...s, bankTransfer: { ...s.bankTransfer, bankName: e.target.value } })} />}</Field>
+            <Field label="Account name">{(p) => <input {...p} className="inp" value={s.bankTransfer.accountName} onChange={(e) => setS({ ...s, bankTransfer: { ...s.bankTransfer, accountName: e.target.value } })} />}</Field>
+            <Field label="Account number">{(p) => <input {...p} className="inp" inputMode="numeric" value={s.bankTransfer.accountNumber} onChange={(e) => setS({ ...s, bankTransfer: { ...s.bankTransfer, accountNumber: e.target.value } })} />}</Field>
+          </section>
           <button className="btn btn-gold btn-block" type="submit" disabled={pending}>
             {pending ? "Saving…" : "Save settings"}
           </button>

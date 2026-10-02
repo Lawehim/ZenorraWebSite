@@ -5,6 +5,7 @@ import { can } from "@/lib/rbac";
 import { relativeTime } from "@/lib/format";
 import { displayPhone } from "@/lib/phone";
 import { StatusPill } from "@/components/ui/StatusPill";
+import { dailyLeadTrend } from "@/server/services/reports";
 
 export const metadata = { title: "Dashboard" };
 
@@ -25,6 +26,8 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
     db.booking.count({ where: { date: { gte: new Date(new Date().toISOString().slice(0, 10)) }, status: { not: "CANCELLED" } } }),
   ]);
   const max = Math.max(1, ...bySource.map((s) => s._count._all));
+  const trend = await dailyLeadTrend(30);
+  const tmax = Math.max(1, ...trend.map((t) => t.count));
 
   return (
     <>
@@ -160,6 +163,35 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           )}
         </section>
       </div>
+      <section className="card" style={{ marginTop: "1.6rem" }} aria-labelledby="trend-h">
+        <h2 id="trend-h">Leads per day · last 30 days</h2>
+        <div className="trend" aria-hidden="true">
+          {trend.map((t) => (
+            <div key={t.date} className="trend-bar" style={{ height: `${Math.max(2, (t.count / tmax) * 100)}%` }} title={`${t.date}: ${t.count}`} />
+          ))}
+        </div>
+        <details>
+          <summary className="label" style={{ cursor: "pointer", marginTop: ".8rem" }}>
+            Show as table
+          </summary>
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th scope="col">Date</th>
+                <th scope="col">Leads</th>
+              </tr>
+            </thead>
+            <tbody>
+              {trend.map((t) => (
+                <tr key={t.date}>
+                  <td>{t.date}</td>
+                  <td className="mono">{t.count}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </details>
+      </section>
     </>
   );
 }

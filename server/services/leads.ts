@@ -370,6 +370,9 @@ export interface LeadFilters {
   from?: string;
   to?: string;
   propertyId?: string;
+  assignedToId?: string; // user id, or "unassigned"
+  overdue?: boolean;
+  sort?: "newest" | "score";
 }
 
 export function leadWhere(f: LeadFilters): Prisma.LeadWhereInput {
@@ -377,6 +380,8 @@ export function leadWhere(f: LeadFilters): Prisma.LeadWhereInput {
   if (f.status) where.status = f.status;
   if (f.source) where.source = f.source;
   if (f.propertyId) where.propertyId = f.propertyId;
+  if (f.assignedToId) where.assignedToId = f.assignedToId === "unassigned" ? null : f.assignedToId;
+  if (f.overdue) where.escalatedAt = { not: null };
   if (f.from || f.to) where.createdAt = { ...(f.from ? { gte: new Date(f.from) } : {}), ...(f.to ? { lte: new Date(`${f.to}T23:59:59Z`) } : {}) };
   if (f.q) {
     const q = f.q.trim();
@@ -388,7 +393,13 @@ export function leadWhere(f: LeadFilters): Prisma.LeadWhereInput {
 export async function listLeads(f: LeadFilters, page = 1, pageSize = 50) {
   const where = leadWhere(f);
   const [rows, total] = await Promise.all([
-    db.lead.findMany({ where, orderBy: { createdAt: "desc" }, skip: (page - 1) * pageSize, take: pageSize, include: { property: { select: { name: true } } } }),
+    db.lead.findMany({
+      where,
+      orderBy: f.sort === "score" ? [{ score: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }] : { createdAt: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      include: { property: { select: { name: true } }, assignedTo: { select: { name: true } } },
+    }),
     db.lead.count({ where }),
   ]);
   return { rows, total, page, pageSize };

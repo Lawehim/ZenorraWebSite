@@ -43,6 +43,11 @@ export default async function EditPost({ params }: { params: Promise<{ id: strin
           </p>
           <h1>{isNew ? "New article" : post!.title}</h1>
         </div>
+        {!isNew && (
+          <Link className="btn btn-ghost btn-sm" href={`/admin/posts/${id}/history`}>
+            Revision history
+          </Link>
+        )}
       </div>
       <PostEditor id={isNew ? null : id} initial={initial} categories={cats.map((c) => ({ id: c.id, name: c.name }))} canPublish={can(user.role, "posts.publish")} coverAssets={Object.fromEntries(assets.map((a) => [a.key, a.id]))} />
     </>

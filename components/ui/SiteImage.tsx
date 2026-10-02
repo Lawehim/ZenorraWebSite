@@ -8,6 +8,8 @@ export interface ImageSource {
   height?: number | null;
   srcSet?: string;
   avifSrcSet?: string;
+  focalX?: number | null;
+  focalY?: number | null;
 }
 
 export interface SiteImageProps {
@@ -35,7 +37,11 @@ export function SiteImage({ image, brief, meta, ratio, full, priority, sizes = "
         loading={priority ? "eager" : "lazy"}
         fetchPriority={priority ? "high" : undefined}
         decoding="async"
-        style={ratio ? { aspectRatio: ratio, objectFit: "cover", width: "100%" } : undefined}
+        style={{
+          ...(ratio ? { aspectRatio: ratio, objectFit: "cover" as const, width: "100%" } : {}),
+          // Focal point keeps the subject in frame when cards and heroes crop (FR-ADM-027).
+          ...(image.focalX != null && image.focalY != null ? { objectPosition: `${Math.round(image.focalX * 100)}% ${Math.round(image.focalY * 100)}%` } : {}),
+        }}
       />
     </picture>
   );

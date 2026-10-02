@@ -3,6 +3,7 @@ import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { updateMediaAction, deleteMediaAction } from "@/server/actions/media";
 import { formatDateLagos } from "@/lib/format";
+import { FocalPicker } from "./FocalPicker";
 
 interface Asset {
   id: string;
@@ -15,6 +16,8 @@ interface Asset {
   height: number | null;
   bytes: number;
   createdAt: string;
+  focalX?: number | null;
+  focalY?: number | null;
 }
 
 const MAX = 15 * 1024 * 1024;
@@ -114,7 +117,7 @@ export function MediaLibrary({ assets, canDelete }: { assets: Asset[]; canDelete
               }}
             >
               <h2>Image details</h2>
-              <img src={selected.thumb} alt={selected.alt} style={{ marginBottom: "1rem", border: "1px solid var(--line)" }} />
+              <FocalPicker key={selected.id} id={selected.id} src={selected.thumb} alt={selected.alt} focalX={selected.focalX ?? null} focalY={selected.focalY ?? null} />
               <dl className="brief" style={{ marginBottom: "1rem" }}>
                 <dt>File</dt>
                 <dd>{selected.filename}</dd>
