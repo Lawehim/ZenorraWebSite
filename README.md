@@ -1,0 +1,89 @@
+# Zenorra Limited — website & admin portal
+
+Public marketing site (real estate + solar energy), lead engine and admin portal for **Zenorra Limited**, built to the *Zenorra Platform Requirements* SRS v1.0 (Phase 1) and the approved prototype design.
+
+- **Stack:** Next.js 16 (App Router, React 19 Server Components), TypeScript strict, Tailwind CSS 4 tokens + ported prototype styles, Prisma 6 + PostgreSQL, Tiptap rich text, Zod validation, Argon2id auth, Jest + Testing Library. **No Vite anywhere** (Jest runs via `next/jest`/SWC).
+- **Built test-first:** every business rule, service and interactive component has tests written before the implementation — see [`tests/`](tests/).
+
+## Quick start (Windows, macOS or Linux)
+
+Requires Node.js 20+ (built on 24). No database install is needed — an embedded PostgreSQL server is downloaded with the npm packages.
+
+```bash
+npm install            # also runs `prisma generate`
+npm run db:setup       # starts embedded Postgres, creates tables, seeds sample content + first admin
+npm run dev            # starts Postgres + Next.js at http://localhost:3000
+```
+
+- Website: http://localhost:3000
+- Admin portal: http://localhost:3000/admin — the first Super Admin's email and generated password are written to **`.data/initial-admin.txt`** (git-ignored). Change the password under *My account* and switch on two-factor authentication.
+
+To use your own PostgreSQL instead, set `DATABASE_URL` in `.env` and run `npx prisma db push && npx prisma db execute --file prisma/sql/audit-immutable.sql --schema prisma/schema.prisma && npm run db:seed`.
+
+## Tests
+
+```bash
+npm test                    # everything
+npm run test:unit           # pure logic + React components (fast, no database)
+npm run test:integration    # services against a real throwaway Postgres (embedded, port 54339)
+npm run typecheck
+```
+
+| Suite | What it covers (SRS references in each test name) |
+|---|---|
+| `tests/unit` | Naira formatting & instalment maths, phone/email normalisation & dedupe keys, slugs & references, RBAC matrix (every role × capability), catalogue filters/sort/featured/related, article visibility & scheduling, inspection dates in Africa/Lagos, password policy, HTML sanitisation (XSS), image magic-byte sniffing, editable-content registry, form schemas, message templates, legal-page parser |
+| `tests/components` | Button, Field (label/error association), Modal (focus trap, Escape, focus return, scroll lock), PropertyCard, PropertyFilters (crawlable URLs), ArticleCard, TestimonialCarousel (7s, pause, keyboard), StatCounter (reduced motion), AdvisorWizard (5 steps, aria-disabled, back, restore, validation, retry), ContentBlockForm (admin content editor) |
+| `tests/integration` | Lead capture, consent evidence, dedupe within 30 days, idempotent double-submit, honeypot, rate limiting, bookings (past/non-operating days), newsletter double opt-in & unsubscribe, lead status/notes/CSV export with RBAC, content & settings editing with audit, audit-log immutability (DB trigger), sign-in/lockout/idle & absolute session expiry/invites/removal, properties (slugs, 301 redirects without chains, sold-out, price RBAC), posts (scheduling, sanitisation, revisions, soft delete), media upload (type sniffing, 15MB, EXIF strip, derivatives, in-use protection), notification outbox retries |
+
+## What the admin can change (no developer needed)
+
+| Area | Where | Notes |
+|---|---|---|
+| **All page copy** — every headline, paragraph, list, button label, page header, CTA band, footer text, form wording, legal pages | Admin → **Site content** | Each section has a form generated from its field definitions in [`lib/content/registry.ts`](lib/content/registry.ts). Validated server-side, audited, *Restore original text* available. |
+| Images on any section | Site content → image fields → *Choose* | Picks from the Media library; empty = labelled placeholder showing the photo brief. |
+| Insights / blog | Admin → Insights | Rich text editor, categories, cover image, schedule for a future time (WAT), preview, duplicate, soft delete + restore, SEO fields, local draft recovery. |
+| Properties | Admin → Properties | Price/deposit/plan with live instalment preview, title type (C of O / Governor's Consent require a document reference), features, badges, gallery ordering, featured order, sold-out state, 301 redirect on slug change. |
+| Media | Admin → Media library | Drag-and-drop batches, type checked by content, EXIF/GPS stripped, WebP/AVIF/JPEG derivatives, alt text required before public use, can't delete images in use. |
+| Testimonials | Admin → Testimonials | Order, hide/show. |
+| Contact details, socials, Google reviews, WhatsApp, inspection days & departure points, lead routing emails | Admin → Settings | Propagates everywhere (footer, contact page, WhatsApp buttons, structured data). |
+| Leads, inspections, subscribers, users & roles, audit log, notifications | Admin sidebar | Inline status changes, timeline & notes, CSV export (audited, watermarked), printable coach manifest, invitations, 2FA. |
+
+Roles follow the SRS RBAC matrix exactly ([`lib/rbac.ts`](lib/rbac.ts)) and are enforced on the server for every action — hidden buttons are a courtesy, not the control.
+
+## Architecture (where things live)
+
+```
+app/(marketing)/      public pages — server components, revalidated on admin change (ISR, 60s fallback)
+app/admin/            login, invite acceptance, and the (portal) behind the session guard
+app/api/              public form endpoints (origin-checked, rate-limited), admin uploads/exports, cron
+app/media/[...key]    uploaded images, served sandboxed with nosniff from outside the web root
+components/ui         primitives (Button, Field, Modal, Placeholder, Icon, StatusPill)
+components/marketing  composites (PropertyCard, Filters, Gallery, Carousel…)
+components/sections   page sections (PageHeader, CtaBand, FeatureGrid, Journey…)
+components/forms      AdvisorWizard, BookingForm, ContactForm, Newsletter
+components/admin      ContentBlockForm, PostEditor (Tiptap), PropertyForm, MediaLibrary…
+lib/                  framework-free business rules (all unit-tested)
+server/services       domain services (leads, auth, content, media, notifications…) — integration-tested
+server/actions        Next.js server actions: authorise → call service → revalidate
+prisma/               schema, seed, SQL guard making AuditLog append-only
+```
+
+## Integrations (stubbed until keys are provided)
+
+Messages are written to an outbox table first (a lead is never lost to a provider outage) and delivered by adapters in [`server/services/transports.ts`](server/services/transports.ts):
+
+| Env var | Effect |
+|---|---|
+| `RESEND_API_KEY`, `MAIL_FROM` | Transactional + internal email via Resend |
+| `TERMII_API_KEY`, `TERMII_SENDER_ID` | Booking SMS via Termii (registered alphanumeric sender) |
+| `CRON_SECRET` | Protects `/api/cron/notifications` (call every minute for retries + purges) |
+| `APP_URL` | Absolute links in emails, sitemap, structured data |
+
+Without keys, every message is visible in **Admin → Notifications**.
+
+## Deviations from the SRS (and why)
+
+- **Auth:** self-hosted sessions (hashed opaque tokens in Postgres) instead of Auth.js — same guarantees (Argon2id, TOTP, 8h absolute / 60min idle, immediate revocation, lockout) with fewer moving parts on Next 16.
+- **Redis / R2 / QStash:** replaced locally by Postgres rate-limit counters, local disk media storage and an outbox table. Each sits behind a small module so the production service can be swapped in.
+- **Analytics (GA4/Meta Pixel):** consent banner and storage are implemented; tags are not loaded until IDs are provided.
+- **Phase 2/3** items (live chat, WhatsApp two-way, buyer portal, payments, referrals) are not built; the schema leaves room for them.

@@ -1,0 +1,454 @@
+// Zenorra platform — SRS v1.0 §7.7 data model (Phase 1 entities).
+// Phase 3 entities (Buyer, Purchase, Instalment, Payment, Document, Referral)
+// are intentionally not created yet; nothing here needs rework to add them.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMINISTRATOR
+  EDITOR
+  ADVISOR
+  VIEWER
+}
+
+enum UserStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+  REMOVED
+}
+
+model User {
+  id             String     @id @default(cuid())
+  email          String     @unique
+  name           String
+  passwordHash   String?
+  role           Role       @default(VIEWER)
+  status         UserStatus @default(INVITED)
+  twoFactorSecret String?
+  twoFactorEnabled Boolean  @default(false)
+  failedLogins   Int        @default(0)
+  failedWindowStart DateTime?
+  lockedUntil    DateTime?
+  inviteToken    String?    @unique
+  inviteExpires  DateTime?
+  lastLoginAt    DateTime?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  sessions   Session[]
+  posts      Post[]
+  auditLogs  AuditLog[]
+  activities LeadActivity[]
+  leads      Lead[]         @relation("assignedLeads")
+}
+
+model Session {
+  id         String   @id @default(cuid())
+  tokenHash  String   @unique
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  ip         String?
+  userAgent  String?
+
+  @@index([userId])
+}
+
+enum PropertyStatus {
+  DRAFT
+  PUBLISHED
+  SOLD_OUT
+  ARCHIVED
+}
+
+enum Availability {
+  AVAILABLE
+  SELLING_FAST
+  SOLD_OUT
+}
+
+enum TitleType {
+  C_OF_O
+  GOVERNORS_CONSENT
+  EXCISION
+  GAZETTE
+  REGISTERED_SURVEY
+  EXCISION_IN_PROGRESS
+  OTHER
+}
+
+model Property {
+  id               String         @id @default(cuid())
+  reference        String         @unique
+  slug             String         @unique
+  name             String
+  corridor         String
+  locationText     String
+  lat              Float?
+  lng              Float?
+  titleType        TitleType
+  titleLabel       String?
+  titleDocRef      String?
+  sizeText         String?
+  sizeSqm          Int?
+  priceNaira       BigInt
+  priceUnit        String?
+  depositPercent   Int            @default(30)
+  planMonths       Int            @default(12)
+  allocationText   String?
+  currencies       String[]       @default(["NGN"])
+  appreciationNote String?
+  blurb            String?
+  description      String?
+  features         String[]       @default([])
+  badges           String[]       @default([])
+  availability     Availability   @default(AVAILABLE)
+  status           PropertyStatus @default(DRAFT)
+  featured         Boolean        @default(false)
+  featuredOrder    Int?
+  curatedOrder     Int            @default(0)
+  heroBrief        String?
+  seoTitle         String?
+  seoDescription   String?
+  publishedAt      DateTime?
+  deletedAt        DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  phases    PropertyPhase[]
+  media     PropertyMedia[]
+  documents PropertyDocument[]
+  leads     Lead[]
+  bookings  Booking[]
+
+  @@index([status, corridor, priceNaira])
+}
+
+model PropertyPhase {
+  id             String   @id @default(cuid())
+  propertyId     String
+  property       Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  name           String
+  priceNaira     BigInt
+  plotsTotal     Int      @default(0)
+  plotsAvailable Int      @default(0)
+  status         String   @default("SELLING")
+  opensAt        DateTime?
+  order          Int      @default(0)
+}
+
+model PropertyMedia {
+  id           String     @id @default(cuid())
+  propertyId   String
+  property     Property   @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  mediaAssetId String
+  mediaAsset   MediaAsset @relation(fields: [mediaAssetId], references: [id])
+  order        Int        @default(0)
+  role         String     @default("gallery")
+
+  @@unique([propertyId, mediaAssetId])
+}
+
+model PropertyDocument {
+  id           String     @id @default(cuid())
+  propertyId   String
+  property     Property   @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  mediaAssetId String
+  mediaAsset   MediaAsset @relation(fields: [mediaAssetId], references: [id])
+  kind         String
+  label        String
+  isPublic     Boolean    @default(false)
+}
+
+enum PostStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHED
+  ARCHIVED
+}
+
+model Category {
+  id          String  @id @default(cuid())
+  slug        String  @unique
+  name        String
+  description String?
+  posts       Post[]
+}
+
+model Post {
+  id             String     @id @default(cuid())
+  slug           String     @unique
+  title          String
+  excerpt        String?
+  body           Json?
+  bodyHtml       String?
+  categoryId     String?
+  category       Category?  @relation(fields: [categoryId], references: [id])
+  authorId       String?
+  author         User?      @relation(fields: [authorId], references: [id])
+  authorName     String?
+  coverMediaId   String?
+  coverMedia     MediaAsset? @relation(fields: [coverMediaId], references: [id])
+  status         PostStatus @default(DRAFT)
+  publishedAt    DateTime?
+  readingMinutes Int?
+  readingOverride Boolean   @default(false)
+  seoTitle       String?
+  seoDescription String?
+  deletedAt      DateTime?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  revisions PostRevision[]
+
+  @@index([status, publishedAt])
+}
+
+model PostRevision {
+  id        String   @id @default(cuid())
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  title     String
+  body      Json?
+  createdBy String?
+  createdAt DateTime @default(now())
+}
+
+model MediaAsset {
+  id          String    @id @default(cuid())
+  key         String    @unique
+  filename    String
+  mimeType    String
+  bytes       Int
+  width       Int?
+  height      Int?
+  alt         String?
+  caption     String?
+  focalX      Float?
+  focalY      Float?
+  derivatives Json?
+  uploadedBy  String?
+  deletedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  propertyMedia PropertyMedia[]
+  documents     PropertyDocument[]
+  posts         Post[]
+  testimonials  Testimonial[]
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  BOOKED_INSPECTION
+  NEGOTIATING
+  CLOSED_WON
+  CLOSED_LOST
+}
+
+model Lead {
+  id              String     @id @default(cuid())
+  reference       String     @unique
+  name            String
+  phoneE164       String?
+  email           String?
+  objective       String?
+  corridors       String[]   @default([])
+  budgetBand      String?
+  timeline        String?
+  residency       String?
+  note            String?
+  enquiryType     String?
+  propertyId      String?
+  property        Property?  @relation(fields: [propertyId], references: [id])
+  source          String
+  status          LeadStatus @default(NEW)
+  score           Int?
+  assignedToId    String?
+  assignedTo      User?      @relation("assignedLeads", fields: [assignedToId], references: [id])
+  utm             Json?
+  landingPath     String?
+  pagePath        String?
+  referrer        String?
+  deviceClass     String?
+  marketingConsent Boolean   @default(false)
+  disposableEmail Boolean    @default(false)
+  readAt          DateTime?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  lastContactedAt DateTime?
+
+  activities LeadActivity[]
+  consents   Consent[]
+  bookings   Booking[]
+
+  @@index([phoneE164])
+  @@index([email])
+  @@index([status, createdAt])
+}
+
+model LeadActivity {
+  id        String   @id @default(cuid())
+  leadId    String
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  type      String
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id])
+  payload   Json?
+  createdAt DateTime @default(now())
+
+  @@index([leadId, createdAt])
+}
+
+model Consent {
+  id           String    @id @default(cuid())
+  leadId       String
+  lead         Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  purpose      String
+  granted      Boolean
+  textVersion  String
+  textSnapshot String
+  ip           String?
+  userAgent    String?
+  grantedAt    DateTime  @default(now())
+  withdrawnAt  DateTime?
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  ATTENDED
+}
+
+model Booking {
+  id             String        @id @default(cuid())
+  reference      String        @unique
+  leadId         String
+  lead           Lead          @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  propertyId     String?
+  property       Property?     @relation(fields: [propertyId], references: [id])
+  date           DateTime      @db.Date
+  departurePoint String
+  seats          Int
+  status         BookingStatus @default(PENDING)
+  createdAt      DateTime      @default(now())
+
+  @@index([date])
+}
+
+enum SubscriberStatus {
+  PENDING
+  ACTIVE
+  UNSUBSCRIBED
+}
+
+model Subscriber {
+  id             String           @id @default(cuid())
+  email          String           @unique
+  status         SubscriberStatus @default(PENDING)
+  confirmToken   String?          @unique
+  tokenExpires   DateTime?
+  confirmedAt    DateTime?
+  unsubscribedAt DateTime?
+  createdAt      DateTime         @default(now())
+}
+
+model Testimonial {
+  id           String      @id @default(cuid())
+  name         String
+  roleText     String
+  quote        String
+  initials     String?
+  mediaAssetId String?
+  mediaAsset   MediaAsset? @relation(fields: [mediaAssetId], references: [id])
+  videoUrl     String?
+  order        Int         @default(0)
+  published    Boolean     @default(true)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+}
+
+// Site-wide settings: contact details, hours, social links, WhatsApp, departure points.
+model Setting {
+  key       String   @id
+  value     Json
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+}
+
+// Editable copy for every section of every public page (headlines, paragraphs,
+// lists, CTAs). The field schema for each key lives in lib/content/registry.ts.
+model ContentBlock {
+  key       String   @id
+  data      Json
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+}
+
+model Redirect {
+  id         String   @id @default(cuid())
+  fromPath   String   @unique
+  toPath     String
+  statusCode Int      @default(301)
+  createdAt  DateTime @default(now())
+}
+
+// Append-only. See prisma/sql/audit-immutable.sql for the trigger that blocks UPDATE/DELETE.
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actor      User?    @relation(fields: [actorId], references: [id])
+  action     String
+  entityType String
+  entityId   String?
+  before     Json?
+  after      Json?
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId, createdAt])
+}
+
+enum NotificationStatus {
+  QUEUED
+  SENT
+  FAILED
+}
+
+// Outbox for email/SMS/WhatsApp. A lead is always persisted before a row lands here.
+model Notification {
+  id          String             @id @default(cuid())
+  channel     String
+  to          String
+  template    String
+  payload     Json
+  status      NotificationStatus @default(QUEUED)
+  attempts    Int                @default(0)
+  nextAttemptAt DateTime         @default(now())
+  lastError   String?
+  leadId      String?
+  createdAt   DateTime           @default(now())
+  sentAt      DateTime?
+
+  @@index([status, nextAttemptAt])
+}
+
+// Fixed-window rate limit counters (Redis stand-in for local/self-hosted runs).
+model RateLimit {
+  key       String   @id
+  count     Int
+  windowEnd DateTime
+}
