@@ -9,13 +9,17 @@ const INTERVAL = 20_000;
 export function useDraftRecovery<T>(key: string, current: T, saved: T) {
   const [stored, setStored] = useState<T | null>(null);
   const latest = useRef(current);
-  latest.current = current;
+  useEffect(() => {
+    latest.current = current;
+  });
 
   useEffect(() => {
     try {
       const raw = localStorage.getItem(PREFIX + key);
       if (raw) {
         const parsed = JSON.parse(raw) as T;
+        // Reading browser storage is only possible after mount; one extra render is intended.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         if (JSON.stringify(parsed) !== JSON.stringify(saved)) setStored(parsed);
       }
     } catch {

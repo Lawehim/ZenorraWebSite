@@ -17,6 +17,8 @@ export async function startEmbedded({ dir, port, database }) {
     password: LOCAL_PASSWORD,
     port,
     persistent: true,
+    // UTF-8 is required for ₦, →, Yoruba diacritics and emoji; Windows would otherwise default to WIN1252.
+    initdbFlags: ["--encoding=UTF8", "--locale=C"],
     onLog: () => {},
     onError: (e) => process.env.PG_DEBUG && console.error(String(e)),
   });

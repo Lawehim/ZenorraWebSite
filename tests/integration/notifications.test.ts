@@ -5,7 +5,11 @@ import { resetDb } from "./helpers";
 beforeEach(resetDb);
 afterAll(() => db.$disconnect());
 
-const now = new Date("2026-09-02T09:00:00Z");
+// Messages are stamped with the database clock when queued, so the worker runs on the real clock too.
+let now = new Date();
+beforeEach(() => {
+  now = new Date(Date.now() + 1000);
+});
 const later = (mins: number) => new Date(now.getTime() + mins * 60_000);
 
 describe("notification outbox (FR-NOTIF-009, TC-NOTIF-004/005)", () => {

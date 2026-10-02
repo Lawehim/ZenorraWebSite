@@ -32,7 +32,12 @@ export function Header({ ctaLabel }: { ctaLabel: string }) {
     return () => window.removeEventListener("scroll", on);
   }, []);
 
-  useEffect(() => setMenu(false), [pathname]);
+  // Close the menu on route change (state adjusted during render, not in an effect).
+  const [lastPath, setLastPath] = useState(pathname);
+  if (lastPath !== pathname) {
+    setLastPath(pathname);
+    setMenu(false);
+  }
 
   // FR-GLOB-003: Escape closes, focus trapped, body scroll locked.
   useEffect(() => {

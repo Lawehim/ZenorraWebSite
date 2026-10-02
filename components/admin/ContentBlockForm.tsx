@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { BlockDef } from "@/lib/content/registry";
 import type { FieldDef } from "@/lib/content/fields";
 import { Field } from "@/components/ui/Field";
@@ -145,7 +145,12 @@ export function ContentBlockForm({ def, value, onSave, onReset }: ContentBlockFo
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const recovery = useDraftRecovery(`content:${def.key}`, draft, initial);
 
-  useEffect(() => setDraft(initial), [initial]);
+  // When the saved value changes (after a save/refresh), reset the draft to it.
+  const [lastInitial, setLastInitial] = useState(initial);
+  if (lastInitial !== initial) {
+    setLastInitial(initial);
+    setDraft(initial);
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();

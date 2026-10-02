@@ -11,6 +11,8 @@ export const metadata = { title: "Dashboard" };
 export default async function Dashboard({ searchParams }: { searchParams: Promise<{ denied?: string }> }) {
   const user = await requirePageUser();
   const { denied } = await searchParams;
+  // Server component rendered per request (dynamic), so reading the clock here is intended.
+  // eslint-disable-next-line react-hooks/purity
   const since = new Date(Date.now() - 30 * 86400_000);
   const [leads, leads30, posts, properties, media, recent, bySource, bookings] = await Promise.all([
     db.lead.count(),

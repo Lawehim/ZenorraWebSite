@@ -13,10 +13,10 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "jest",
+    "test": "npm run test:unit && npm run test:integration",
     "test:unit": "jest --selectProjects unit components",
-    "test:integration": "jest --selectProjects integration",
-    "test:coverage": "jest --coverage",
+    "test:integration": "jest --selectProjects integration --runInBand --forceExit --testTimeout=30000",
+    "test:coverage": "jest --selectProjects unit components --coverage",
     "postinstall": "prisma generate"
   },
   "dependencies": {

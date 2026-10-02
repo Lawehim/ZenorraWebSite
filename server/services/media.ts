@@ -17,26 +17,26 @@ export const MAX_BATCH_BYTES = 100 * 1024 * 1024;
 export const DERIVATIVE_WIDTHS = [400, 800, 1200, 1920, 2560];
 
 function root() {
-  return path.resolve(process.env.MEDIA_DIR ?? "uploads");
+  return path.resolve(/*turbopackIgnore: true*/ process.env.MEDIA_DIR ?? "uploads");
 }
 
 /** Resolve a storage key safely — no traversal outside the media root (TC-SEC-013). */
 export function safePath(key: string): string | null {
   if (!/^[a-z0-9/_.-]+$/i.test(key) || key.includes("..")) return null;
-  const full = path.resolve(root(), key);
+  const full = path.resolve(/*turbopackIgnore: true*/ root(), key);
   return full.startsWith(root() + path.sep) ? full : null;
 }
 
 async function write(key: string, data: Buffer) {
   const full = safePath(key)!;
-  await fs.mkdir(path.dirname(full), { recursive: true });
-  await fs.writeFile(full, data);
+  await fs.mkdir(/*turbopackIgnore: true*/ path.dirname(full), { recursive: true });
+  await fs.writeFile(/*turbopackIgnore: true*/ full, data);
 }
 
 export async function readStored(key: string): Promise<Buffer> {
   const full = safePath(key);
   if (!full) throw new Error("Invalid key");
-  return fs.readFile(full);
+  return fs.readFile(/*turbopackIgnore: true*/ full);
 }
 
 export interface Derivative {

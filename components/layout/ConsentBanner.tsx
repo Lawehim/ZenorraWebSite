@@ -38,6 +38,8 @@ export function ConsentBanner() {
   const [marketing, setMarketing] = useState(false);
 
   useEffect(() => {
+    // Consent lives in browser storage, readable only after mount.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!readConsent()) setOpen(true);
     const reopen = () => setOpen(true);
     window.addEventListener("zn:consent-open", reopen);
