@@ -47,8 +47,19 @@ npm run typecheck
 | Testimonials | Admin → Testimonials | Order, hide/show. |
 | Contact details, socials, Google reviews, WhatsApp, inspection days & departure points, lead routing emails | Admin → Settings | Propagates everywhere (footer, contact page, WhatsApp buttons, structured data). |
 | Leads, inspections, subscribers, users & roles, audit log, notifications | Admin sidebar | Inline status changes, timeline & notes, CSV export (audited, watermarked), printable coach manifest, invitations, 2FA. |
+| Lead scoring, assignment & SLA | Leads list, Settings → Assignment | Score column/sort, round-robin or manual assignment, first-response SLA with overdue flag and escalation. |
+| Live chat | Admin → Live chat | Visitor chat widget on every public page; office hours in Settings; offline messages become leads; WhatsApp threads appear here too. |
+| Reports & privacy | Admin → Reports, Privacy | Funnel/source reports with CSV export, daily trend on the dashboard, data-subject export & erasure. |
+| Team, partners, categories, shot list, post history | Admin sidebar | About-page team/partners, insight categories, photo shot list, revision diff + restore. |
+| Property documents | Property → Documents | PDF survey/brochure uploads, public or buyer-only. |
+| Buyers, purchases, payments | Admin → Buyers group | Create a purchase with an instalment schedule, invite the buyer, record offline (bank) payments, statements & receipts (PDF), document vault, support tickets, referral approvals. |
+| Bank details, referrals, FX, digest | Admin → Settings | Bank transfer account, referral threshold/commission, indicative GBP/USD/CAD rates, daily digest recipients. |
 
 Roles follow the SRS RBAC matrix exactly ([`lib/rbac.ts`](lib/rbac.ts)) and are enforced on the server for every action — hidden buttons are a courtesy, not the control.
+
+## Buyer portal (`/account`)
+
+Buyers are invited from Admin → Purchases. They sign in with a password or a one-time code (email/SMS, 10 minutes, 5 attempts) and can see each plot's schedule and arrears, pay an instalment through Paystack, download statements/receipts and vault documents (signed links valid 15 minutes), open support tickets, and share a referral code (`ZN` + 6 characters). Buyer sessions never grant admin access.
 
 ## Architecture (where things live)
 
@@ -76,7 +87,9 @@ Messages are written to an outbox table first (a lead is never lost to a provide
 |---|---|
 | `RESEND_API_KEY`, `MAIL_FROM` | Transactional + internal email via Resend |
 | `TERMII_API_KEY`, `TERMII_SENDER_ID` | Booking SMS via Termii (registered alphanumeric sender) |
-| `CRON_SECRET` | Protects `/api/cron/notifications` (call every minute for retries + purges) |
+| `CRON_SECRET` | Protects `/api/cron/notifications` — `vercel.json` calls it every 5 minutes (deliveries + retries, lead SLA escalation, inspection & payment reminders 09:00–20:00 WAT, daily digest, purges) |
+| `PAYSTACK_SECRET_KEY` | Buyer card/transfer payments. Register `{APP_URL}/api/webhooks/paystack` in Paystack; the signed webhook (not the browser redirect) marks a payment successful, and is idempotent. Without a key, *Pay now* opens a local simulator (dev only). |
+| `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID`, `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN` | Two-way WhatsApp via Meta Cloud API. Register `{APP_URL}/api/webhooks/whatsapp`. Inbound messages land in Admin → Live chat; `STOP` opts out. Outbound reminders need Meta-approved templates (e.g. `booking_reminder`). |
 | `APP_URL` | Absolute links in emails, sitemap, structured data |
 
 Without keys, every message is visible in **Admin → Notifications**.
@@ -86,4 +99,6 @@ Without keys, every message is visible in **Admin → Notifications**.
 - **Auth:** self-hosted sessions (hashed opaque tokens in Postgres) instead of Auth.js — same guarantees (Argon2id, TOTP, 8h absolute / 60min idle, immediate revocation, lockout) with fewer moving parts on Next 16.
 - **Redis / R2 / QStash:** replaced locally by Postgres rate-limit counters, local disk media storage and an outbox table. Each sits behind a small module so the production service can be swapped in.
 - **Analytics (GA4/Meta Pixel):** consent banner and storage are implemented; tags are not loaded until IDs are provided.
-- **Phase 2/3** items (live chat, WhatsApp two-way, buyer portal, payments, referrals) are not built; the schema leaves room for them.
+- **Video uploads/transcoding (FR-ADM-028):** not built — video testimonials use YouTube/Vimeo embed URLs.
+- **Partner-developer read-only access:** not built; partners are shown on the About page only.
+- **Payments:** Paystack only (no Flutterwave). Money is stored as kobo (BigInt); overpayments carry forward to the next instalment.
