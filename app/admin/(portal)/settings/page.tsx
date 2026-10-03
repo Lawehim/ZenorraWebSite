@@ -15,7 +15,7 @@ export default async function SettingsPage() {
           <p>Contact details, social links and inspection logistics. Changes update the footer, contact page, WhatsApp links and structured data everywhere within a minute.</p>
         </div>
       </div>
-      <SettingsForm initial={s} />
+      <SettingsForm initial={s} keys={{ paystack: Boolean(process.env.PAYSTACK_SECRET_KEY), flutterwave: Boolean(process.env.FLW_SECRET_KEY && process.env.FLW_SECRET_HASH) }} />
     </>
   );
 }

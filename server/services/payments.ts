@@ -5,15 +5,19 @@ import { db } from "@/lib/db";
 import { assertCan } from "@/lib/rbac";
 import { makeReference } from "@/lib/reference";
 import { allocatePayment, outstanding } from "@/lib/payments/schedule";
-import { formatKobo, paystackFailureMessage } from "@/lib/payments/paystack";
+import { formatKobo } from "@/lib/payments/paystack";
+import { normaliseFlutterwaveEvent, nairaAmountToKobo } from "@/lib/payments/flutterwave";
+import { paymentProviderFor, providerConfigured, providerFailureMessage, type PaymentProvider } from "@/lib/payments/provider";
 import { lagosDateString } from "@/lib/bookings/dates";
 import { enqueue } from "./notifications";
 import { audit } from "./audit";
 import { checkReferralQualification } from "./referrals";
 import { buildReceiptPdf, storePrivateFile } from "./buyer-docs";
+import { getSettings } from "./settings";
 import type { Actor } from "./actor";
 
 const PAYSTACK_INIT = "https://api.paystack.co/transaction/initialize";
+const FLW_API = "https://api.flutterwave.com/v3";
 
 async function instalmentForBuyer(buyerId: string, instalmentId: string) {
   return db.instalment.findFirst({ where: { id: instalmentId, purchase: { buyerId } }, include: { purchase: { include: { instalments: true, buyer: true } } } });
@@ -28,26 +32,54 @@ export async function initiatePayment(buyerId: string, instalmentId: string, amo
   if (amountKobo <= 0n) return { ok: false, message: "Enter an amount above zero." };
   if (amountKobo > owed) return { ok: false, message: `That's more than your outstanding balance of ${formatKobo(owed)}.` };
   const reference = `ZP-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
-  await db.payment.create({ data: { instalmentId, provider: "paystack", providerRef: reference, amountKobo } });
+  const provider = paymentProviderFor((await getSettings()).payments);
+  await db.payment.create({ data: { instalmentId, provider, providerRef: reference, amountKobo } });
 
-  const secret = process.env.PAYSTACK_SECRET_KEY;
   const appUrl = process.env.APP_URL ?? "http://localhost:3000";
-  if (!secret) {
+  if (!providerConfigured(provider)) {
     if (process.env.NODE_ENV === "production") return { ok: false, message: "Online payment isn't available yet. Please pay by bank transfer using the details on this page." };
     return { ok: true, reference, checkoutUrl: `/account/pay/simulate?ref=${reference}` }; // local development only
   }
-  const res = await fetch(PAYSTACK_INIT, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ email: inst.purchase.buyer.email ?? `buyer-${buyerId}@zenorra.invalid`, amount: Number(amountKobo), reference, currency: "NGN", callback_url: `${appUrl}/account/pay/return?ref=${reference}`, metadata: { instalmentId, purchase: inst.purchase.reference } }),
-    signal: AbortSignal.timeout(20_000),
-  }).catch(() => null);
-  const data = res && res.ok ? ((await res.json()) as { status: boolean; data?: { authorization_url: string } }) : null;
-  if (!data?.status || !data.data) {
+  const checkoutUrl = provider === "flutterwave" ? await flutterwaveCheckout(inst, reference, amountKobo, appUrl) : await paystackCheckout(inst, reference, amountKobo, appUrl);
+  if (!checkoutUrl) {
     await db.payment.update({ where: { providerRef: reference }, data: { status: "FAILED", reasonCode: "init-failed" } });
     return { ok: false, message: "We couldn't reach the payment provider. Nothing was charged — please try again shortly." };
   }
-  return { ok: true, reference, checkoutUrl: data.data.authorization_url };
+  return { ok: true, reference, checkoutUrl };
+}
+
+type BuyerInstalment = NonNullable<Awaited<ReturnType<typeof instalmentForBuyer>>>;
+
+async function paystackCheckout(inst: BuyerInstalment, reference: string, amountKobo: bigint, appUrl: string): Promise<string | null> {
+  const res = await fetch(PAYSTACK_INIT, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ email: inst.purchase.buyer.email ?? `buyer-${inst.purchase.buyerId}@zenorra.invalid`, amount: Number(amountKobo), reference, currency: "NGN", callback_url: `${appUrl}/account/pay/return?ref=${reference}`, metadata: { instalmentId: inst.id, purchase: inst.purchase.reference } }),
+    signal: AbortSignal.timeout(20_000),
+  }).catch(() => null);
+  const data = res && res.ok ? ((await res.json()) as { status: boolean; data?: { authorization_url: string } }) : null;
+  return data?.status && data.data ? data.data.authorization_url : null;
+}
+
+/** Flutterwave Standard: hosted checkout link; amounts are sent in naira (major units). */
+async function flutterwaveCheckout(inst: BuyerInstalment, reference: string, amountKobo: bigint, appUrl: string): Promise<string | null> {
+  const b = inst.purchase.buyer;
+  const res = await fetch(`${FLW_API}/payments`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${process.env.FLW_SECRET_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      tx_ref: reference,
+      amount: `${amountKobo / 100n}.${String(amountKobo % 100n).padStart(2, "0")}`,
+      currency: "NGN",
+      redirect_url: `${appUrl}/account/pay/return?ref=${reference}`,
+      customer: { email: b.email ?? `buyer-${b.id}@zenorra.invalid`, name: b.name, phonenumber: b.phoneE164 ?? undefined },
+      customizations: { title: "Zenorra Limited", description: `${inst.label} — ${inst.purchase.reference}` },
+      meta: { instalmentId: inst.id, purchase: inst.purchase.reference },
+    }),
+    signal: AbortSignal.timeout(20_000),
+  }).catch(() => null);
+  const data = res && res.ok ? ((await res.json()) as { status?: string; data?: { link?: string } }) : null;
+  return data?.status === "success" && data.data?.link ? data.data.link : null;
 }
 
 export async function paymentStatusForBuyer(buyerId: string, reference: string) {
@@ -93,27 +125,78 @@ interface PaystackEvent {
   data: { reference: string; amount: number; status?: string; gateway_response?: string; channel?: string };
 }
 
-export async function handlePaystackEvent(evt: PaystackEvent): Promise<"applied" | "duplicate" | "failed" | "ignored"> {
-  const ref = evt.data?.reference;
-  if (!ref) return "ignored";
-  const pay = await db.payment.findUnique({ where: { providerRef: ref } });
-  if (!pay) return "ignored";
-  if (evt.event === "charge.success") {
+type WebhookResult = "applied" | "duplicate" | "failed" | "ignored" | "mismatch";
+type Outcome = { reference: string; outcome: "success" | "failed" | "abandoned" | "other"; amountKobo: bigint; method: string; reason: string };
+
+/** Provider-neutral outcome handling. Atomic, so a replayed webhook never double-credits. */
+async function applyOutcome(provider: PaymentProvider, o: Outcome, raw: unknown): Promise<WebhookResult> {
+  const pay = await db.payment.findUnique({ where: { providerRef: o.reference } });
+  if (!pay || pay.provider !== provider) return "ignored";
+  if (o.outcome === "success") {
     // Atomic claim: only one delivery of this webhook can move PENDING → SUCCESS.
-    const claimed = await db.payment.updateMany({ where: { id: pay.id, status: { in: ["PENDING", "FAILED", "ABANDONED"] } }, data: { status: "SUCCESS", paidAt: new Date(), rawWebhook: evt as never } });
+    const claimed = await db.payment.updateMany({ where: { id: pay.id, status: { in: ["PENDING", "FAILED", "ABANDONED"] } }, data: { status: "SUCCESS", paidAt: new Date(), rawWebhook: raw as never } });
     if (!claimed.count) return "duplicate";
-    await applySuccess(pay.id, BigInt(evt.data.amount), evt.data.channel ?? "card");
+    await applySuccess(pay.id, o.amountKobo, o.method);
     return "applied";
   }
-  if (evt.event === "charge.failed" || evt.data.status === "failed" || evt.data.status === "abandoned") {
-    await db.payment.updateMany({ where: { id: pay.id, status: "PENDING" }, data: { status: evt.data.status === "abandoned" ? "ABANDONED" : "FAILED", reasonCode: (evt.data.gateway_response ?? "").slice(0, 120), rawWebhook: evt as never } });
+  if (o.outcome === "failed" || o.outcome === "abandoned") {
+    await db.payment.updateMany({ where: { id: pay.id, status: "PENDING" }, data: { status: o.outcome === "abandoned" ? "ABANDONED" : "FAILED", reasonCode: o.reason.slice(0, 120), rawWebhook: raw as never } });
     return "failed";
   }
   return "ignored";
 }
 
+export async function handlePaystackEvent(evt: PaystackEvent): Promise<WebhookResult> {
+  const ref = evt.data?.reference;
+  if (!ref) return "ignored";
+  const failed = evt.event === "charge.failed" || evt.data.status === "failed" || evt.data.status === "abandoned";
+  const outcome = evt.event === "charge.success" ? "success" : failed ? (evt.data.status === "abandoned" ? "abandoned" : "failed") : "other";
+  return applyOutcome("paystack", { reference: ref, outcome, amountKobo: BigInt(evt.data.amount ?? 0), method: evt.data.channel ?? "card", reason: evt.data.gateway_response ?? "" }, evt);
+}
+
+export interface FlutterwaveVerification {
+  status?: string;
+  amount?: number | string;
+  currency?: string;
+  tx_ref?: string;
+}
+
+/** GET /transactions/:id/verify — Flutterwave's recommended check before giving value. */
+async function verifyWithFlutterwave(transactionId: string): Promise<FlutterwaveVerification | null> {
+  const res = await fetch(`${FLW_API}/transactions/${encodeURIComponent(transactionId)}/verify`, { headers: { Authorization: `Bearer ${process.env.FLW_SECRET_KEY}` }, signal: AbortSignal.timeout(20_000) }).catch(() => null);
+  if (!res?.ok) return null;
+  return ((await res.json()) as { data?: FlutterwaveVerification }).data ?? null;
+}
+
+/**
+ * Flutterwave webhook. A success only credits when the amount and currency match what was
+ * initiated and, when the secret key is configured, Flutterwave's verify API agrees.
+ */
+export async function handleFlutterwaveEvent(evt: unknown, opts: { verify?: (transactionId: string) => Promise<FlutterwaveVerification | null> } = {}): Promise<WebhookResult> {
+  const o = normaliseFlutterwaveEvent(evt);
+  if (!o) return "ignored";
+  const pay = await db.payment.findUnique({ where: { providerRef: o.reference } });
+  if (!pay || pay.provider !== "flutterwave") return "ignored";
+  if (o.outcome === "success") {
+    if (pay.status === "SUCCESS") return "duplicate";
+    if (o.currency !== "NGN" || o.amountKobo !== pay.amountKobo) return mismatch(pay.id, "amount-mismatch");
+    const verify = opts.verify ?? (process.env.FLW_SECRET_KEY ? verifyWithFlutterwave : null);
+    if (verify) {
+      const v = await verify(o.transactionId);
+      const vKobo = v?.amount === undefined ? null : nairaAmountToKobo(v.amount);
+      if (!v || v.status !== "successful" || v.currency !== "NGN" || v.tx_ref !== o.reference || vKobo !== pay.amountKobo) return mismatch(pay.id, "verify-failed");
+    }
+  }
+  return applyOutcome("flutterwave", o, evt);
+}
+
+async function mismatch(paymentId: string, reason: string): Promise<WebhookResult> {
+  await audit(null, "webhook.mismatch", "Payment", paymentId, { after: { provider: "flutterwave", reason } });
+  return "mismatch";
+}
+
 export function failureMessageFor(reasonCode: string | null) {
-  return paystackFailureMessage(reasonCode);
+  return providerFailureMessage(reasonCode);
 }
 
 /** Bank transfer received directly (FR-PAY-008). */

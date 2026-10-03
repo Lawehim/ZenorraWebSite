@@ -8,7 +8,7 @@ const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", 
 
 const SOCIAL_LABELS = { instagram: "Instagram", facebook: "Facebook", tiktok: "TikTok", linkedin: "LinkedIn", youtube: "YouTube", x: "X (Twitter)" } as const;
 
-export function SettingsForm({ initial }: { initial: SiteSettings }) {
+export function SettingsForm({ initial, keys = { paystack: false, flutterwave: false } }: { initial: SiteSettings; keys?: { paystack: boolean; flutterwave: boolean } }) {
   const [s, setS] = useState(initial);
   const [points, setPoints] = useState(initial.departurePoints.join("\n"));
   const [currencies, setCurrencies] = useState(initial.currencies.join(", "));
@@ -184,6 +184,21 @@ export function SettingsForm({ initial }: { initial: SiteSettings }) {
             <Field label="Bank">{(p) => <input {...p} className="inp" value={s.bankTransfer.bankName} onChange={(e) => setS({ ...s, bankTransfer: { ...s.bankTransfer, bankName: e.target.value } })} />}</Field>
             <Field label="Account name">{(p) => <input {...p} className="inp" value={s.bankTransfer.accountName} onChange={(e) => setS({ ...s, bankTransfer: { ...s.bankTransfer, accountName: e.target.value } })} />}</Field>
             <Field label="Account number">{(p) => <input {...p} className="inp" inputMode="numeric" value={s.bankTransfer.accountNumber} onChange={(e) => setS({ ...s, bankTransfer: { ...s.bankTransfer, accountNumber: e.target.value } })} />}</Field>
+          </section>
+          <section className="card" style={{ marginBottom: "1rem" }}>
+            <h2>Online payments</h2>
+            <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
+              <legend className="label">Provider for new payments</legend>
+              {(["paystack", "flutterwave"] as const).map((p) => (
+                <label key={p} className="consent" style={{ margin: ".2rem 0" }}>
+                  <input type="radio" name="payments-provider" checked={s.payments.provider === p} onChange={() => setS({ ...s, payments: { provider: p } })} /> {p === "paystack" ? "Paystack" : "Flutterwave"}{" "}
+                  <span className="muted" style={{ fontSize: ".78rem" }}>{keys[p] ? "· keys configured" : "· keys not set on the server"}</span>
+                </label>
+              ))}
+            </fieldset>
+            <p className="muted" style={{ fontSize: ".8rem" }}>
+              Payments already started finish with the provider they began on. Keys are set by your developer as environment variables (see README), never here.
+            </p>
           </section>
           <button className="btn btn-gold btn-block" type="submit" disabled={pending}>
             {pending ? "Saving…" : "Save settings"}

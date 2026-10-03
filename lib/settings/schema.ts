@@ -75,6 +75,8 @@ export const siteSettingsSchema = z.object({
     accountName: z.string().trim().max(120),
     accountNumber: z.string().trim().max(20),
   }),
+  // Online payment provider (SRS A-5). Keys live in environment variables, never here.
+  payments: z.object({ provider: z.enum(["paystack", "flutterwave"]) }),
 });
 
 export type SiteSettings = z.infer<typeof siteSettingsSchema>;
@@ -112,6 +114,7 @@ export const DEFAULT_SETTINGS: SiteSettings = {
   whatsappMessaging: { enabled: false },
   referrals: { enabled: true, thresholdPercent: 30, commissionPercent: 2 },
   bankTransfer: { bankName: "", accountName: "Zenorra Limited", accountNumber: "" },
+  payments: { provider: "paystack" },
 };
 
 /** Merge stored settings over defaults, ignoring anything that no longer validates. */

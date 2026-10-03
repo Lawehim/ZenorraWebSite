@@ -4,7 +4,8 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { buyerSignIn, requestOtp, verifyOtp, acceptBuyerInvite, signOutBuyer, mergeShortlist } from "@/server/services/buyer-auth";
-import { initiatePayment, handlePaystackEvent } from "@/server/services/payments";
+import { initiatePayment, handlePaystackEvent, handleFlutterwaveEvent } from "@/server/services/payments";
+import { paymentProviderFor, providerConfigured } from "@/lib/payments/provider";
 import { createTicket } from "@/server/services/tickets";
 import { BUYER_COOKIE, requireBuyer, setBuyerCookie } from "@/server/auth/buyer-session";
 import { db } from "@/lib/db";
@@ -77,13 +78,19 @@ export async function payAction(_p: AccountState, form: FormData): Promise<Accou
   redirect(r.checkoutUrl);
 }
 
-/** Local development only: stand-in for Paystack's checkout + webhook when no secret key is set. */
+/** Local development only: stand-in for the provider's checkout + webhook when its keys aren't set. */
 export async function simulatePaymentAction(reference: string, outcome: "success" | "failed") {
-  if (process.env.NODE_ENV === "production" || process.env.PAYSTACK_SECRET_KEY) throw new Error("Not available");
+  if (process.env.NODE_ENV === "production") throw new Error("Not available");
   const buyer = await requireBuyer();
   const pay = await db.payment.findFirst({ where: { providerRef: reference, instalment: { purchase: { buyerId: buyer.id } } } });
   if (!pay) throw new Error("Unknown payment");
-  await handlePaystackEvent({ event: outcome === "success" ? "charge.success" : "charge.failed", data: { reference, amount: Number(pay.amountKobo), status: outcome, gateway_response: outcome === "success" ? "Approved" : "Declined", channel: "card (simulated)" } });
+  const provider = paymentProviderFor({ provider: pay.provider });
+  if (providerConfigured(provider)) throw new Error("Not available");
+  if (provider === "flutterwave") {
+    await handleFlutterwaveEvent({ event: "charge.completed", data: { id: 0, tx_ref: reference, amount: Number(pay.amountKobo) / 100, currency: "NGN", status: outcome === "success" ? "successful" : "failed", processor_response: outcome === "success" ? "Approved" : "Declined", payment_type: "card (simulated)" } });
+  } else {
+    await handlePaystackEvent({ event: outcome === "success" ? "charge.success" : "charge.failed", data: { reference, amount: Number(pay.amountKobo), status: outcome, gateway_response: outcome === "success" ? "Approved" : "Declined", channel: "card (simulated)" } });
+  }
   redirect(`/account/pay/return?ref=${reference}`);
 }
 
