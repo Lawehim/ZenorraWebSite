@@ -9,6 +9,12 @@ describe("site settings (FR-ADM-047)", () => {
     expect(DEFAULT_SETTINGS.googleReviewsUrl).toBe("https://g.page/r/CWizvEMq3uuSEBM/review");
   });
 
+  it("includes the YouTube channel, and fills it in on records saved before YouTube existed", () => {
+    expect(DEFAULT_SETTINGS.social.youtube).toBe("https://www.youtube.com/@zenorralimited");
+    const old = resolveSettings({ social: { instagram: "https://www.instagram.com/zenorraltd", facebook: "", tiktok: "", linkedin: "", x: "" } });
+    expect(old.social.youtube).toBe("https://www.youtube.com/@zenorralimited");
+  });
+
   it("defaults validate against the schema", () => {
     expect(siteSettingsSchema.safeParse(DEFAULT_SETTINGS).success).toBe(true);
   });

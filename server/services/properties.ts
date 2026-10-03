@@ -170,3 +170,25 @@ export async function setPropertyMedia(actor: Actor, propertyId: string, mediaId
   await audit(actor, "property.media", "Property", propertyId, { after: { mediaIds } });
   return { ok: true as const };
 }
+
+/** Attach a library PDF to a property, public or internal (FR-ADM-036). */
+export async function attachPropertyDocument(actor: Actor, propertyId: string, input: { mediaAssetId: string; label: string; kind: string; isPublic: boolean }) {
+  assertCan(actor.role, "properties.edit");
+  const asset = await db.mediaAsset.findUniqueOrThrow({ where: { id: input.mediaAssetId } });
+  if (asset.mimeType !== "application/pdf") throw new Error("Only PDF documents can be attached.");
+  const doc = await db.propertyDocument.create({ data: { propertyId, mediaAssetId: asset.id, label: input.label.trim().slice(0, 80) || asset.filename, kind: input.kind.slice(0, 30), isPublic: input.isPublic } });
+  await audit(actor, "property.document.attach", "Property", propertyId, { after: { label: doc.label, isPublic: doc.isPublic } });
+  return doc;
+}
+
+export async function setPropertyDocumentVisibility(actor: Actor, documentId: string, isPublic: boolean) {
+  assertCan(actor.role, "properties.edit");
+  const d = await db.propertyDocument.update({ where: { id: documentId }, data: { isPublic } });
+  await audit(actor, "property.document.visibility", "Property", d.propertyId, { after: { label: d.label, isPublic } });
+}
+
+export async function removePropertyDocument(actor: Actor, documentId: string) {
+  assertCan(actor.role, "properties.edit");
+  const d = await db.propertyDocument.delete({ where: { id: documentId } });
+  await audit(actor, "property.document.remove", "Property", d.propertyId, { before: { label: d.label } });
+}

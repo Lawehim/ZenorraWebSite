@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
   const path = (await headers()).get("x-zn-path") ?? "/admin";
   const user = await requirePageUser("dashboard.view", path);
-  const unread = await db.lead.count({ where: { readAt: null } });
+  const [unread, unreadChats] = await Promise.all([db.lead.count({ where: { readAt: null } }), db.chatThread.count({ where: { status: "OPEN", unreadByStaff: { gt: 0 } } })]);
   return (
     <div className="admin">
       <header className="adm-top">
@@ -40,7 +40,7 @@ export default async function PortalLayout({ children }: { children: React.React
         </div>
       </header>
       <div className="adm-shell">
-        <AdminNav role={user.role} unreadLeads={unread} />
+        <AdminNav role={user.role} unreadLeads={unread} unreadChats={unreadChats} />
         <main className="adm-main" id="main">
           {requiresTwoFactor(user.role) && !user.twoFactorEnabled && (
             <p className="notice">

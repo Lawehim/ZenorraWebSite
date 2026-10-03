@@ -29,6 +29,7 @@ export const siteSettingsSchema = z.object({
     facebook: url,
     tiktok: url,
     linkedin: url,
+    youtube: url,
     x: url,
   }),
   inspectionDays: z.array(z.number().int().min(0).max(6)).min(1, "Choose at least one inspection day."),
@@ -40,6 +41,40 @@ export const siteSettingsSchema = z.object({
     diaspora: z.string().trim().toLowerCase().email(),
   }),
   currencies: z.array(z.string().trim().min(3).max(3)).min(1),
+  // ---- Phase 2
+  officeHours: z.object({
+    days: z.array(z.number().int().min(0).max(6)),
+    open: z.string().regex(/^\d{2}:\d{2}$/, "Use HH:MM, e.g. 09:00"),
+    close: z.string().regex(/^\d{2}:\d{2}$/, "Use HH:MM, e.g. 18:00"),
+  }),
+  assignment: z.object({
+    mode: z.enum(["manual", "round-robin"]),
+    slaHours: z.number().int().min(1).max(168),
+  }),
+  digest: z.object({
+    enabled: z.boolean(),
+    recipients: z.array(z.string().trim().toLowerCase().email()),
+    hour: z.number().int().min(0).max(23),
+  }),
+  fx: z.object({
+    enabled: z.boolean(),
+    GBP: z.number().min(0),
+    USD: z.number().min(0),
+    CAD: z.number().min(0),
+    asOf: z.string().max(20),
+  }),
+  whatsappMessaging: z.object({ enabled: z.boolean() }),
+  // ---- Phase 3
+  referrals: z.object({
+    enabled: z.boolean(),
+    thresholdPercent: z.number().min(1).max(100),
+    commissionPercent: z.number().min(0).max(20),
+  }),
+  bankTransfer: z.object({
+    bankName: z.string().trim().max(80),
+    accountName: z.string().trim().max(120),
+    accountNumber: z.string().trim().max(20),
+  }),
 });
 
 export type SiteSettings = z.infer<typeof siteSettingsSchema>;
@@ -58,6 +93,7 @@ export const DEFAULT_SETTINGS: SiteSettings = {
     facebook: "",
     tiktok: "https://www.tiktok.com/@zenorraltd",
     linkedin: "",
+    youtube: "https://www.youtube.com/@zenorralimited",
     x: "",
   },
   inspectionDays: [3, 6],
@@ -69,14 +105,25 @@ export const DEFAULT_SETTINGS: SiteSettings = {
     diaspora: "zenorralimited@gmail.com",
   },
   currencies: ["NGN", "GBP", "USD", "CAD"],
+  officeHours: { days: [1, 2, 3, 4, 5, 6], open: "09:00", close: "18:00" },
+  assignment: { mode: "round-robin", slaHours: 4 },
+  digest: { enabled: true, recipients: ["zenorralimited@gmail.com"], hour: 18 },
+  fx: { enabled: false, GBP: 0, USD: 0, CAD: 0, asOf: "" },
+  whatsappMessaging: { enabled: false },
+  referrals: { enabled: true, thresholdPercent: 30, commissionPercent: 2 },
+  bankTransfer: { bankName: "", accountName: "Zenorra Limited", accountNumber: "" },
 };
 
 /** Merge stored settings over defaults, ignoring anything that no longer validates. */
 export function resolveSettings(stored: unknown): SiteSettings {
   if (!stored || typeof stored !== "object") return clone(DEFAULT_SETTINGS);
-  const merged = { ...clone(DEFAULT_SETTINGS), ...(stored as object) };
-  merged.social = { ...DEFAULT_SETTINGS.social, ...((stored as Partial<SiteSettings>).social ?? {}) };
-  merged.advisorEmails = { ...DEFAULT_SETTINGS.advisorEmails, ...((stored as Partial<SiteSettings>).advisorEmails ?? {}) };
+  const base = clone(DEFAULT_SETTINGS) as unknown as Record<string, unknown>;
+  const merged: Record<string, unknown> = { ...base, ...(stored as object) };
+  // One-level deep merge so new nested settings get defaults on old records.
+  for (const [k, v] of Object.entries(base)) {
+    const sv = (stored as Record<string, unknown>)[k];
+    if (v && typeof v === "object" && !Array.isArray(v) && sv && typeof sv === "object" && !Array.isArray(sv)) merged[k] = { ...v, ...sv };
+  }
   const r = siteSettingsSchema.safeParse(merged);
   return r.success ? r.data : clone(DEFAULT_SETTINGS);
 }

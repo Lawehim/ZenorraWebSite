@@ -20,12 +20,16 @@ export default async function LeadsInbox({ searchParams }: { searchParams: Promi
     from: sp.from || undefined,
     to: sp.to || undefined,
     propertyId: sp.propertyId || undefined,
+    assignedToId: sp.assigned === "me" ? user.id : sp.assigned || undefined,
+    overdue: sp.overdue === "1",
+    sort: sp.sort === "score" ? "score" : "newest",
   };
   const page = Math.max(1, Number(sp.page) || 1);
-  const [{ rows, total, pageSize }, sources, properties] = await Promise.all([
+  const [{ rows, total, pageSize }, sources, properties, advisors] = await Promise.all([
     listLeads(f, page),
     db.lead.findMany({ distinct: ["source"], select: { source: true } }),
     db.property.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    db.user.findMany({ where: { role: { in: ["ADVISOR", "ADMINISTRATOR", "SUPER_ADMIN"] }, status: "ACTIVE" }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
   const qs = new URLSearchParams(Object.entries(sp).filter(([k, v]) => v && k !== "page") as [string, string][]).toString();
   const canEdit = can(user.role, "leads.edit");
@@ -90,6 +94,29 @@ export default async function LeadsInbox({ searchParams }: { searchParams: Promi
           <label htmlFor="to">To</label>
           <input id="to" name="to" type="date" className="inp" defaultValue={sp.to} />
         </div>
+        <div className="field">
+          <label htmlFor="assigned">Assigned to</label>
+          <select id="assigned" name="assigned" className="inp" defaultValue={sp.assigned ?? ""}>
+            <option value="">Anyone</option>
+            <option value="me">Me</option>
+            <option value="unassigned">Unassigned</option>
+            {advisors.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="sort">Sort</label>
+          <select id="sort" name="sort" className="inp" defaultValue={sp.sort ?? "newest"}>
+            <option value="newest">Newest first</option>
+            <option value="score">Highest score first</option>
+          </select>
+        </div>
+        <label className="consent" style={{ alignSelf: "center" }}>
+          <input type="checkbox" name="overdue" value="1" defaultChecked={sp.overdue === "1"} /> Past SLA only
+        </label>
         <button className="btn btn-line btn-sm" type="submit">
           Filter
         </button>
@@ -103,6 +130,8 @@ export default async function LeadsInbox({ searchParams }: { searchParams: Promi
               <th className="hide-sm">Interest</th>
               <th className="hide-sm">Budget</th>
               <th className="hide-sm">Source</th>
+              <th>Score</th>
+              <th className="hide-sm">Advisor</th>
               <th>Age</th>
               <th>Status</th>
             </tr>
@@ -127,13 +156,19 @@ export default async function LeadsInbox({ searchParams }: { searchParams: Promi
                 <td className="hide-sm">{l.property?.name ?? (l.corridors.join(", ") || l.enquiryType || "—")}</td>
                 <td className="hide-sm">{l.budgetBand ?? "—"}</td>
                 <td className="hide-sm">{l.source}</td>
-                <td>{relativeTime(l.createdAt)}</td>
+                <td className="mono">{l.score ?? "—"}</td>
+                <td className="hide-sm">{l.assignedTo?.name ?? "—"}</td>
+                <td>
+                  {relativeTime(l.createdAt)}
+                  {l.escalatedAt && l.status === "NEW" && <span className="pill draft" style={{ marginLeft: ".3rem" }}>Past SLA</span>}
+                  {l.isPartial && <span className="pill" style={{ marginLeft: ".3rem" }}>Partial</span>}
+                </td>
                 <td>{canEdit ? <LeadStatusSelect id={l.id} status={l.status} /> : l.status}</td>
               </tr>
             ))}
             {!rows.length && (
               <tr>
-                <td colSpan={7}>No leads match these filters.</td>
+                <td colSpan={9}>No leads match these filters.</td>
               </tr>
             )}
           </tbody>

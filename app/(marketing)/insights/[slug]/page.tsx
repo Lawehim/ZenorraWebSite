@@ -8,6 +8,8 @@ import { toArticleCard, imageFromAsset } from "@/server/queries/mappers";
 import { ArticleCard } from "@/components/marketing/ArticleCard";
 import { ArticleView } from "@/components/marketing/ArticleView";
 import { Eyebrow } from "@/components/sections";
+import { ShareButtons } from "@/components/marketing/ShareButtons";
+import { ReadingProgress } from "@/components/marketing/ReadingProgress";
 import { JsonLd, BreadcrumbJsonLd } from "@/components/seo/JsonLd";
 
 export const revalidate = 60;
@@ -52,7 +54,8 @@ export default async function ArticlePage({ params }: Props) {
           mainEntityOfPage: `${APP_URL}/insights/${post.slug}`,
         }}
       />
-      <ArticleView title={post.title} category={post.category?.name ?? null} publishedAt={post.publishedAt} readingMinutes={post.readingMinutes} author={author} bodyHtml={post.bodyHtml ?? ""} cover={imageFromAsset(post.coverMedia, post.title)} cta={cta} />
+      <ReadingProgress />
+      <ArticleView share={<ShareButtons url={`${APP_URL}/insights/${post.slug}`} title={post.title} />} title={post.title} category={post.category?.name ?? null} publishedAt={post.publishedAt} readingMinutes={post.readingMinutes} author={author} bodyHtml={post.bodyHtml ?? ""} cover={imageFromAsset(post.coverMedia, post.title)} cta={cta} />
       {more.length > 0 && (
         <section className="sec sec-tight">
           <div className="wrap">

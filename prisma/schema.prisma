@@ -45,6 +45,7 @@ model User {
   updatedAt      DateTime   @updatedAt
 
   sessions   Session[]
+  chatMessages ChatMessage[]
   posts      Post[]
   auditLogs  AuditLog[]
   activities LeadActivity[]
@@ -132,6 +133,7 @@ model Property {
   documents PropertyDocument[]
   leads     Lead[]
   bookings  Booking[]
+  purchases Purchase[]
 
   @@index([status, corridor, priceNaira])
 }
@@ -163,6 +165,7 @@ model PropertyMedia {
 
 model PropertyDocument {
   id           String     @id @default(cuid())
+  createdAt    DateTime   @default(now())
   propertyId   String
   property     Property   @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   mediaAssetId String
@@ -247,6 +250,9 @@ model MediaAsset {
   documents     PropertyDocument[]
   posts         Post[]
   testimonials  Testimonial[]
+  teamMembers   TeamMember[]
+  partners      Partner[]
+  buyerDocuments BuyerDocument[]
 }
 
 enum LeadStatus {
@@ -289,10 +295,22 @@ model Lead {
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
   lastContactedAt DateTime?
+  // Phase 2
+  isPartial        Boolean   @default(false)
+  callbackWindow   String?
+  whatsappOptIn    Boolean   @default(false)
+  firstResponseDueAt DateTime?
+  escalatedAt      DateTime?
+  channelInvalid   String[]  @default([])
+  // Phase 3
+  referralCode     String?
 
   activities LeadActivity[]
   consents   Consent[]
   bookings   Booking[]
+  chats      ChatThread[]
+  buyer      Buyer?
+  referral   Referral?
 
   @@index([phoneE164])
   @@index([email])
@@ -344,6 +362,7 @@ model Booking {
   departurePoint String
   seats          Int
   status         BookingStatus @default(PENDING)
+  reminderSentAt DateTime?
   createdAt      DateTime      @default(now())
 
   @@index([date])
@@ -451,4 +470,255 @@ model RateLimit {
   key       String   @id
   count     Int
   windowEnd DateTime
+}
+
+// ======================================================================
+// Phase 2 — live chat, team, partners
+// ======================================================================
+
+enum ChatStatus {
+  OPEN
+  CLOSED
+}
+
+model ChatThread {
+  id            String        @id @default(cuid())
+  visitorToken  String        @unique
+  name          String?
+  contact       String?
+  pagePath      String?
+  leadId        String?
+  lead          Lead?         @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  status        ChatStatus    @default(OPEN)
+  unreadByStaff Int           @default(0)
+  createdAt     DateTime      @default(now())
+  lastMessageAt DateTime      @default(now())
+  messages      ChatMessage[]
+
+  @@index([status, lastMessageAt])
+}
+
+model ChatMessage {
+  id        String     @id @default(cuid())
+  threadId  String
+  thread    ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  sender    String // VISITOR | STAFF | SYSTEM
+  authorId  String?
+  author    User?      @relation(fields: [authorId], references: [id])
+  body      String
+  createdAt DateTime   @default(now())
+
+  @@index([threadId, createdAt])
+}
+
+model TeamMember {
+  id           String      @id @default(cuid())
+  name         String
+  roleText     String
+  bio          String?
+  mediaAssetId String?
+  mediaAsset   MediaAsset? @relation(fields: [mediaAssetId], references: [id])
+  order        Int         @default(0)
+  published    Boolean     @default(true)
+}
+
+model Partner {
+  id           String      @id @default(cuid())
+  name         String
+  kind         String // DEVELOPER | SOLAR | OTHER
+  url          String?
+  mediaAssetId String?
+  mediaAsset   MediaAsset? @relation(fields: [mediaAssetId], references: [id])
+  order        Int         @default(0)
+  published    Boolean     @default(true)
+}
+
+// ======================================================================
+// Phase 3 — buyer portal, payments, referrals (all money in kobo)
+// ======================================================================
+
+enum BuyerStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+}
+
+model Buyer {
+  id            String          @id @default(cuid())
+  leadId        String?         @unique
+  lead          Lead?           @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  name          String
+  phoneE164     String?         @unique
+  email         String?         @unique
+  passwordHash  String?
+  referralCode  String          @unique
+  status        BuyerStatus     @default(INVITED)
+  inviteToken   String?         @unique
+  inviteExpires DateTime?
+  createdAt     DateTime        @default(now())
+  lastLoginAt   DateTime?
+
+  sessions   BuyerSession[]
+  otps       BuyerOtp[]
+  purchases  Purchase[]
+  documents  BuyerDocument[]
+  referrals  Referral[]       @relation("referrer")
+  tickets    SupportTicket[]
+  shortlist  ShortlistItem[]
+}
+
+model BuyerSession {
+  id         String    @id @default(cuid())
+  tokenHash  String    @unique
+  buyerId    String
+  buyer      Buyer     @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now())
+  lastSeenAt DateTime  @default(now())
+  expiresAt  DateTime
+  revokedAt  DateTime?
+}
+
+model BuyerOtp {
+  id        String    @id @default(cuid())
+  buyerId   String
+  buyer     Buyer     @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  codeHash  String
+  channel   String
+  attempts  Int       @default(0)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([buyerId, createdAt])
+}
+
+model Purchase {
+  id           String       @id @default(cuid())
+  reference    String       @unique
+  buyerId      String
+  buyer        Buyer        @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  propertyId   String
+  property     Property     @relation(fields: [propertyId], references: [id])
+  phaseName    String?
+  plotNumber   String?
+  sizeText     String?
+  priceKobo    BigInt
+  depositKobo  BigInt
+  planMonths   Int
+  allocationStatus String   @default("PENDING") // PENDING | ALLOCATED
+  allocatedAt  DateTime?
+  createdAt    DateTime     @default(now())
+
+  instalments Instalment[]
+  documents   BuyerDocument[]
+  tickets     SupportTicket[]
+  referral    Referral?
+}
+
+enum InstalmentStatus {
+  DUE
+  PART_PAID
+  PAID
+}
+
+model Instalment {
+  id          String           @id @default(cuid())
+  purchaseId  String
+  purchase    Purchase         @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  sequence    Int
+  label       String
+  dueDate     DateTime         @db.Date
+  amountKobo  BigInt
+  paidKobo    BigInt           @default(0)
+  status      InstalmentStatus @default(DUE)
+  remindersSent String[]       @default([])
+  payments    Payment[]
+
+  @@unique([purchaseId, sequence])
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  ABANDONED
+}
+
+model Payment {
+  id           String        @id @default(cuid())
+  instalmentId String
+  instalment   Instalment    @relation(fields: [instalmentId], references: [id], onDelete: Cascade)
+  provider     String // paystack | offline
+  providerRef  String        @unique
+  amountKobo   BigInt
+  status       PaymentStatus @default(PENDING)
+  method       String?
+  reasonCode   String?
+  evidenceRef  String?
+  recordedById String?
+  receiptNumber String?      @unique
+  rawWebhook   Json?
+  createdAt    DateTime      @default(now())
+  paidAt       DateTime?
+}
+
+model BuyerDocument {
+  id           String      @id @default(cuid())
+  buyerId      String
+  buyer        Buyer       @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  purchaseId   String?
+  purchase     Purchase?   @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
+  kind         String // CONTRACT | RECEIPT | SURVEY | DEED | ALLOCATION | OTHER
+  title        String
+  mediaAssetId String?
+  mediaAsset   MediaAsset? @relation(fields: [mediaAssetId], references: [id])
+  storageKey   String?
+  issuedAt     DateTime    @default(now())
+}
+
+enum ReferralStatus {
+  PENDING
+  QUALIFIED
+  PAID
+  REJECTED
+}
+
+model Referral {
+  id              String         @id @default(cuid())
+  referrerId      String
+  referrer        Buyer          @relation("referrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  referredLeadId  String         @unique
+  referredLead    Lead           @relation(fields: [referredLeadId], references: [id], onDelete: Cascade)
+  purchaseId      String?        @unique
+  purchase        Purchase?      @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
+  status          ReferralStatus @default(PENDING)
+  commissionKobo  BigInt         @default(0)
+  approvedById    String?
+  paidAt          DateTime?
+  createdAt       DateTime       @default(now())
+}
+
+model SupportTicket {
+  id         String   @id @default(cuid())
+  reference  String   @unique
+  buyerId    String
+  buyer      Buyer    @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  purchaseId String?
+  purchase   Purchase? @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
+  subject    String
+  body       String
+  status     String   @default("OPEN") // OPEN | ANSWERED | CLOSED
+  reply      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model ShortlistItem {
+  id         String   @id @default(cuid())
+  buyerId    String
+  buyer      Buyer    @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  propertySlug String
+  createdAt  DateTime @default(now())
+
+  @@unique([buyerId, propertySlug])
 }

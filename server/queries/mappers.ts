@@ -26,6 +26,8 @@ export function imageFromAsset(a: MediaAsset | null | undefined, fallbackAlt = "
     height: a.height,
     srcSet: set("webp") || undefined,
     avifSrcSet: set("avif") || undefined,
+    focalX: a.focalX,
+    focalY: a.focalY,
   };
 }
 

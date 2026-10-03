@@ -9,7 +9,7 @@ import { json, sameOrigin } from "@/server/http";
 export async function GET() {
   const u = await currentUser();
   if (!u || !can(u.role, "media.upload")) return json({ ok: false }, 403);
-  const assets = await db.mediaAsset.findMany({ where: { deletedAt: null }, orderBy: { createdAt: "desc" }, take: 300 });
+  const assets = await db.mediaAsset.findMany({ where: { deletedAt: null, mimeType: { startsWith: "image/" } }, orderBy: { createdAt: "desc" }, take: 300 });
   return json({ assets: assets.map((a) => ({ id: a.id, url: `/media/${a.key}`, thumb: `/media/${pickDerivative(a.derivatives, 400)?.key ?? a.key}`, filename: a.filename, alt: a.alt })) });
 }
 

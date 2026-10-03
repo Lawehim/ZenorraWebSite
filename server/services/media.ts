@@ -128,10 +128,16 @@ export async function deleteMedia(actor: Actor, id: string): Promise<{ ok: true 
   return { ok: true };
 }
 
-export async function updateMediaMeta(actor: Actor, id: string, input: { alt?: string; caption?: string }) {
+export async function updateMediaMeta(actor: Actor, id: string, input: { alt?: string; caption?: string; focalX?: number; focalY?: number }) {
   assertCan(actor.role, "media.upload");
   const before = await db.mediaAsset.findUniqueOrThrow({ where: { id } });
-  const data = { alt: input.alt?.trim().slice(0, 250) ?? before.alt, caption: input.caption?.trim().slice(0, 300) ?? before.caption };
+  const clamp = (v: number | undefined, prev: number | null) => (v === undefined || Number.isNaN(v) ? prev : Math.min(1, Math.max(0, v)));
+  const data = {
+    alt: input.alt?.trim().slice(0, 250) ?? before.alt,
+    caption: input.caption?.trim().slice(0, 300) ?? before.caption,
+    focalX: clamp(input.focalX, before.focalX),
+    focalY: clamp(input.focalY, before.focalY),
+  };
   await db.mediaAsset.update({ where: { id }, data });
   await audit(actor, "media.update", "MediaAsset", id, { before: { alt: before.alt, caption: before.caption }, after: data });
 }
@@ -146,4 +152,32 @@ export function pickDerivative(derivatives: unknown, width: number, format: Deri
   const list = (Array.isArray(derivatives) ? derivatives : []) as Derivative[];
   const ofFormat = list.filter((d) => d.format === format).sort((a, b) => a.width - b.width);
   return ofFormat.find((d) => d.width >= width) ?? ofFormat.at(-1) ?? null;
+}
+
+/** PDF documents (brochures, layout plans, price lists) for properties (FR-ADM-036). */
+export async function uploadDocument(actor: Actor, file: { filename: string; bytes: Buffer }): Promise<UploadResult> {
+  assertCan(actor.role, "media.upload");
+  const name = path.basename(file.filename || "document.pdf");
+  if (file.bytes.length > MAX_UPLOAD_BYTES) return { ok: false, message: `${name} is larger than the 15MB limit.` };
+  if (file.bytes.subarray(0, 5).toString("latin1") !== "%PDF-") {
+    await audit(actor, "media.rejected", "MediaAsset", null, { after: { filename: name, reason: "type" } });
+    return { ok: false, message: `${name} isn't a PDF.` };
+  }
+  const stem = slugify(name.replace(/\.[^.]+$/, "")).slice(0, 60);
+  const now = new Date();
+  const key = `docs/${now.getUTCFullYear()}/${stem}-${crypto.randomBytes(6).toString("hex")}.pdf`;
+  await write(key, file.bytes);
+  const asset = await db.mediaAsset.create({ data: { key, filename: `${stem}.pdf`, mimeType: "application/pdf", bytes: file.bytes.length, alt: stem.replace(/-/g, " "), uploadedBy: actor.id } });
+  await audit(actor, "media.upload", "MediaAsset", asset.id, { after: { filename: asset.filename, bytes: asset.bytes } });
+  return { ok: true, asset };
+}
+
+/** Images nothing references — for housekeeping (FR-ADM-029). */
+export async function listUnusedMedia() {
+  const assets = await db.mediaAsset.findMany({
+    where: { deletedAt: null, mimeType: { startsWith: "image/" }, propertyMedia: { none: {} }, posts: { none: {} }, testimonials: { none: {} }, teamMembers: { none: {} }, partners: { none: {} }, documents: { none: {} } },
+    orderBy: { createdAt: "desc" },
+  });
+  const content = JSON.stringify(await db.contentBlock.findMany({ select: { data: true } }));
+  return assets.filter((a) => !content.includes(`/media/${a.key}`));
 }

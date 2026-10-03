@@ -186,7 +186,7 @@ export default async function HomePage() {
         <section className="sec sec-tight">
           <div className="wrap">
             <Eyebrow center>{c["home.testimonials"].eyebrow}</Eyebrow>
-            <TestimonialCarousel items={testimonials.map((t) => ({ id: t.id, name: t.name, roleText: t.roleText, quote: t.quote, initials: t.initials }))} />
+            <TestimonialCarousel items={testimonials.map((t) => ({ id: t.id, name: t.name, roleText: t.roleText, quote: t.quote, initials: t.initials, videoUrl: t.videoUrl }))} />
             {chrome.settings.googleReviewsUrl && (
               <p style={{ textAlign: "center", marginTop: "1.6rem" }}>
                 <Link href={chrome.settings.googleReviewsUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm">

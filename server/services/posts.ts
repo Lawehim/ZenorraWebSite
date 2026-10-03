@@ -123,3 +123,16 @@ export async function saveCategory(actor: Actor, name: string) {
   const slug = slugify(clean);
   return db.category.upsert({ where: { slug }, create: { slug, name: clean }, update: { name: clean } });
 }
+
+/** Restore an earlier revision as the current body; the restore itself becomes a new revision (FR-ADM-015). */
+export async function restoreRevision(actor: Actor, revisionId: string) {
+  assertCan(actor.role, "posts.edit");
+  const rev = await db.postRevision.findUniqueOrThrow({ where: { id: revisionId } });
+  const html = sanitizeRichHtml(((rev.body ?? {}) as { html?: string }).html ?? "");
+  await db.$transaction([
+    db.post.update({ where: { id: rev.postId }, data: { title: rev.title, bodyHtml: html, readingMinutes: readingMinutes(html) } }),
+    db.postRevision.create({ data: { postId: rev.postId, title: rev.title, body: { html }, createdBy: actor.id } }),
+  ]);
+  await audit(actor, "post.restore-revision", "Post", rev.postId, { after: { revisionId } });
+  return rev.postId;
+}

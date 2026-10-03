@@ -16,6 +16,10 @@ import { NotifyNextPhase } from "@/components/forms/NotifyNextPhase";
 import { SiteImage } from "@/components/ui/SiteImage";
 import { OpenModalButton } from "@/components/layout/SiteProvider";
 import { Breadcrumbs, CheckList, Eyebrow } from "@/components/sections";
+import { ShortlistButton } from "@/components/marketing/ShortlistButton";
+import { MapEmbed } from "@/components/marketing/MapEmbed";
+import { PropertyEnquiry } from "@/components/forms/PropertyEnquiry";
+import { indicativePrices } from "@/lib/fx";
 import { JsonLd, BreadcrumbJsonLd } from "@/components/seo/JsonLd";
 
 export const revalidate = 60;
@@ -85,6 +89,12 @@ export default async function PropertyPage({ params }: Props) {
             ))}
           </div>
           <h1>{p.name}</h1>
+          <div style={{ marginTop: ".8rem", display: "flex", gap: ".6rem", flexWrap: "wrap" }}>
+            <ShortlistButton slug={p.slug} name={p.name} variant="inline" />
+            <a className="btn btn-ghost btn-sm" href={`/compare?slugs=${p.slug}`}>
+              Compare
+            </a>
+          </div>
           <p className="mono" style={{ color: "var(--ink-2)", fontSize: ".8rem", letterSpacing: ".14em", marginTop: ".6rem" }}>
             {p.reference} · {p.locationText.toUpperCase()}
           </p>
@@ -179,6 +189,13 @@ export default async function PropertyPage({ params }: Props) {
                     {formatNaira(activePhase?.priceNaira ?? p.priceNaira)}
                   </div>
                   {activePhase && <p style={{ fontSize: ".8rem", color: "var(--ink-3)" }}>{activePhase.name} pricing</p>}
+                  {settings.fx.enabled && indicativePrices(activePhase?.priceNaira ?? p.priceNaira, settings.fx).length > 0 && (
+                    <p className="fx">
+                      Indicative: <b>{indicativePrices(activePhase?.priceNaira ?? p.priceNaira, settings.fx).map((x) => x.label).join(" · ")}</b>
+                      <br />
+                      Rates as of {settings.fx.asOf}. Naira is the contractual price.
+                    </p>
+                  )}
                   <p style={{ fontSize: ".85rem", color: "var(--ink-3)" }}>Initial deposit from {formatNaira(depositAmount(p.priceNaira, p.depositPercent))} ({p.depositPercent}%)</p>
                   <div className="pay">
                     {p.planMonths > 0 && (
@@ -221,6 +238,25 @@ export default async function PropertyPage({ params }: Props) {
           </div>
         </div>
       </section>
+
+      {!soldOut && (
+        <section className="sec sec-tight">
+          <div className="wrap">
+            <div className="split" style={{ alignItems: "start" }}>
+              <div>
+                <Eyebrow>Ask about this estate</Eyebrow>
+                <h2 style={{ fontSize: "var(--fs-h2)", marginBottom: "1.2rem" }}>Enquire about {p.name}</h2>
+                <PropertyEnquiry slug={p.slug} name={p.name} corridor={p.corridor} />
+              </div>
+              <div>
+                <Eyebrow>Location</Eyebrow>
+                <p className="muted" style={{ marginBottom: "1rem" }}>{p.locationText}</p>
+                <MapEmbed query={p.lat != null && p.lng != null ? `${p.lat},${p.lng}` : p.locationText} label={p.name} />
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {related.length > 0 && (
         <section className="sec sec-tight">

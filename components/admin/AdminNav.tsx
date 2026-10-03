@@ -15,14 +15,26 @@ const GROUPS: { title: string; items: { href: string; label: string; icon: strin
       { href: "/admin/properties", label: "Properties", icon: "home", cap: "properties.edit" },
       { href: "/admin/media", label: "Media library", icon: "media", cap: "media.upload" },
       { href: "/admin/testimonials", label: "Testimonials", icon: "quote", cap: "testimonials.manage" },
+      { href: "/admin/team", label: "Team & partners", icon: "users", cap: "testimonials.manage" },
+      { href: "/admin/categories", label: "Categories", icon: "posts", cap: "posts.edit" },
     ],
   },
   {
     title: "Sales",
     items: [
       { href: "/admin/leads", label: "Leads inbox", icon: "leads", cap: "leads.view" },
+      { href: "/admin/chat", label: "Live chat", icon: "content", cap: "leads.view" },
       { href: "/admin/inspections", label: "Inspections", icon: "calendar", cap: "inspections.manage" },
+      { href: "/admin/reports", label: "Reports", icon: "growth", cap: "reports.view" },
       { href: "/admin/subscribers", label: "Subscribers", icon: "bell", cap: "leads.export" },
+    ],
+  },
+  {
+    title: "Buyers",
+    items: [
+      { href: "/admin/buyers", label: "Buyers & payments", icon: "card", cap: "buyers.view" },
+      { href: "/admin/referrals", label: "Referrals", icon: "key", cap: "referrals.approve" },
+      { href: "/admin/tickets", label: "Support tickets", icon: "bell", cap: "buyers.view" },
     ],
   },
   {
@@ -31,13 +43,14 @@ const GROUPS: { title: string; items: { href: string; label: string; icon: strin
       { href: "/admin/settings", label: "Settings", icon: "settings", cap: "settings.edit" },
       { href: "/admin/users", label: "Users & roles", icon: "users", cap: "users.manage" },
       { href: "/admin/audit", label: "Audit log", icon: "audit", cap: "audit.view" },
+      { href: "/admin/privacy", label: "Privacy requests", icon: "shield", cap: "leads.export" },
       { href: "/admin/notifications", label: "Notifications", icon: "bell", cap: "audit.view" },
       { href: "/admin/account", label: "My account", icon: "person", cap: "dashboard.view" },
     ],
   },
 ];
 
-export function AdminNav({ role, unreadLeads }: { role: Role; unreadLeads: number }) {
+export function AdminNav({ role, unreadLeads, unreadChats = 0 }: { role: Role; unreadLeads: number; unreadChats?: number }) {
   const pathname = usePathname();
   return (
     <nav className="adm-side" aria-label="Admin">
@@ -53,6 +66,7 @@ export function AdminNav({ role, unreadLeads }: { role: Role; unreadLeads: numbe
                 <Link key={i.href} href={i.href} className="adm-nav" aria-current={current ? "page" : undefined}>
                   <Icon name={i.icon} />
                   {i.label}
+                  {i.href === "/admin/chat" && unreadChats > 0 && <span className="badge" aria-label={`${unreadChats} unread chats`}>{unreadChats}</span>}
                   {i.href === "/admin/leads" && unreadLeads > 0 && (
                     <span className="badge" aria-label={`${unreadLeads} unread`}>
                       {unreadLeads}

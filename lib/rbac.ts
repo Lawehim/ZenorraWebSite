@@ -26,6 +26,12 @@ const PERMISSIONS = {
   "users.manage": ADMINS,
   "audit.view": ADMINS,
   "dsr.erase": ["SUPER_ADMIN"],
+  // Phase 3 (SRS §7.8 P3 rows) and supporting capabilities
+  "payments.offline": ADMINS,
+  "referrals.approve": ADMINS,
+  "buyers.manage": ADMINS,
+  "buyers.view": [...ADMINS, "ADVISOR"],
+  "reports.view": [...ADMINS, "VIEWER"],
 } satisfies Record<string, Role[]>;
 
 export type Capability = keyof typeof PERMISSIONS;

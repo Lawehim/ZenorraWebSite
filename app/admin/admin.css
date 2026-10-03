@@ -91,3 +91,12 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
   .admin, .adm-main, .tblwrap, .tbl td, .tbl th { background: #fff !important; color: #000 !important; }
   .adm-shell { display: block; }
 }
+.trend { display: flex; align-items: flex-end; gap: 3px; height: 120px; border-bottom: 1px solid var(--line); }
+.trend-bar { flex: 1; background: var(--gold); opacity: 0.85; min-height: 2px; }
+.diff { font-family: var(--mono); font-size: 0.8rem; white-space: pre-wrap; border: 1px solid var(--line); }
+.diff div { padding: 0.15rem 0.6rem; }
+.diff .add { background: rgba(132, 174, 145, 0.14); color: var(--ok); }
+.diff .del { background: rgba(217, 138, 91, 0.12); color: var(--warn); text-decoration: line-through; }
+.focal { position: relative; display: inline-block; cursor: crosshair; max-width: 100%; }
+.focal img { display: block; max-width: 100%; }
+.focal .pin { position: absolute; width: 18px; height: 18px; margin: -9px 0 0 -9px; border: 2px solid var(--gold); border-radius: 50%; box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.6); pointer-events: none; }

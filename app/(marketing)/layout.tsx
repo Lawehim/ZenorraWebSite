@@ -6,6 +6,7 @@ import { Footer } from "@/components/layout/Footer";
 import { ActionRail } from "@/components/layout/ActionRail";
 import { ConsentBanner } from "@/components/layout/ConsentBanner";
 import { OrganizationJsonLd } from "@/components/seo/JsonLd";
+import { LazyChat } from "@/components/chat/LazyChat";
 
 export default async function MarketingLayout({ children }: { children: React.ReactNode }) {
   const { settings, content, bookableProperties } = await getSiteChrome();
@@ -24,6 +25,7 @@ export default async function MarketingLayout({ children }: { children: React.Re
       <main id="main">{children}</main>
       <Footer settings={settings} copy={content["site.footer"]} />
       <ActionRail whatsappNumber={settings.whatsappNumber} whatsappLabel={content["site.rail"].whatsappLabel} inspectLabel={content["site.rail"].inspectLabel} defaultMessage={content["site.rail"].whatsappMessage} />
+      <LazyChat />
       <ConsentBanner />
       <OrganizationJsonLd settings={settings} />
     </SiteProvider>
