@@ -15,6 +15,7 @@ interface U {
   locked: boolean;
   twoFactor: boolean;
   lastLogin: string;
+  partnerName?: string | null;
 }
 
 const ROLES: { value: Role; label: string }[] = [
@@ -24,9 +25,10 @@ const ROLES: { value: Role; label: string }[] = [
   { value: "ADVISOR", label: "Advisor" },
   { value: "VIEWER", label: "Viewer" },
 ];
+const PARTNER_ROLE = { value: "PARTNER" as Role, label: "Partner developer (read-only portal)" };
 
-export function UsersManager({ users, meId, meRole }: { users: U[]; meId: string; meRole: Role }) {
-  const [v, setV] = useState({ name: "", email: "", role: "EDITOR" as Role });
+export function UsersManager({ users, meId, meRole, partners = [] }: { users: U[]; meId: string; meRole: Role; partners?: { id: string; name: string }[] }) {
+  const [v, setV] = useState({ name: "", email: "", role: "EDITOR" as Role, partnerId: "" });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [link, setLink] = useState<string | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
@@ -38,7 +40,7 @@ export function UsersManager({ users, meId, meRole }: { users: U[]; meId: string
       try {
         await fn();
       } catch (e) {
-        setFailure(e instanceof Error && /own account/.test(e.message) ? e.message : "That change isn't allowed for your role.");
+        setFailure(e instanceof Error && /own account|invite a new user/.test(e.message) ? e.message : "That change isn't allowed for your role.");
       }
     });
 
@@ -50,11 +52,11 @@ export function UsersManager({ users, meId, meRole }: { users: U[]; meId: string
         onSubmit={(e) => {
           e.preventDefault();
           start(async () => {
-            const r = await inviteUserAction(v);
+            const r = await inviteUserAction(v.role === "PARTNER" ? v : { ...v, partnerId: undefined });
             if (r.ok) {
               setLink(`${location.origin}${r.link}`);
               setErrors({});
-              setV({ name: "", email: "", role: "EDITOR" });
+              setV({ name: "", email: "", role: "EDITOR", partnerId: "" });
             } else setErrors(r.errors);
           });
         }}
@@ -71,7 +73,7 @@ export function UsersManager({ users, meId, meRole }: { users: U[]; meId: string
         <Field label="Role">
           {(p) => (
             <select {...p} className="inp" value={v.role} onChange={(e) => setV({ ...v, role: e.target.value as Role })}>
-              {roles.map((r) => (
+              {[...roles, PARTNER_ROLE].map((r) => (
                 <option key={r.value} value={r.value}>
                   {r.label}
                 </option>
@@ -79,6 +81,20 @@ export function UsersManager({ users, meId, meRole }: { users: U[]; meId: string
             </select>
           )}
         </Field>
+        {v.role === "PARTNER" && (
+          <Field label="Partner developer" error={errors.partnerId} help="They will only see figures for estates linked to this partner. Add partners under Team & partners.">
+            {(p) => (
+              <select {...p} className="inp" value={v.partnerId} onChange={(e) => setV({ ...v, partnerId: e.target.value })}>
+                <option value="">Choose a partner…</option>
+                {partners.map((x) => (
+                  <option key={x.id} value={x.id}>
+                    {x.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </Field>
+        )}
         <button className="btn btn-gold btn-sm" type="submit" disabled={pending}>
           Send invitation
         </button>
@@ -118,8 +134,11 @@ export function UsersManager({ users, meId, meRole }: { users: U[]; meId: string
                     <div style={{ fontSize: ".78rem" }}>{u.email}</div>
                   </td>
                   <td>
-                    {protectedRow ? (
-                      u.roleLabel
+                    {protectedRow || u.role === "PARTNER" ? (
+                      <>
+                        {u.roleLabel}
+                        {u.partnerName && <div style={{ fontSize: ".75rem" }}>{u.partnerName}</div>}
+                      </>
                     ) : (
                       <>
                         <label className="sr-only" htmlFor={`role-${u.id}`}>

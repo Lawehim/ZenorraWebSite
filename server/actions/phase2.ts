@@ -9,6 +9,7 @@ import { renameCategory, mergeCategories, deleteCategory } from "@/server/servic
 import { updateMediaMeta } from "@/server/services/media";
 import { attachPropertyDocument, setPropertyDocumentVisibility, removePropertyDocument } from "@/server/services/properties";
 import { saveTeamMember, deleteTeamMember, savePartner, deletePartner } from "@/server/services/people";
+import { setPropertyPartner } from "@/server/services/partner-portal";
 import { db } from "@/lib/db";
 
 export async function assignLeadAction(leadId: string, userId: string) {
@@ -144,9 +145,21 @@ export async function savePartnerAction(id: string | null, data: Record<string, 
   return { ok: true };
 }
 
-export async function deletePartnerAction(id: string) {
+export async function deletePartnerAction(id: string): Promise<{ ok: boolean; message?: string }> {
   const actor = await requireActor("testimonials.manage");
-  await deletePartner(actor, id);
+  try {
+    await deletePartner(actor, id);
+  } catch (e) {
+    if (e instanceof Error && /portal users/.test(e.message)) return { ok: false, message: e.message };
+    throw e;
+  }
   revalidatePath("/admin/team");
   revalidatePath("/about");
+  return { ok: true };
+}
+
+export async function setPropertyPartnerAction(propertyId: string, partnerId: string | null) {
+  const actor = await requireActor("properties.publish");
+  await setPropertyPartner(actor, propertyId, partnerId);
+  revalidatePath(`/admin/properties/${propertyId}`);
 }

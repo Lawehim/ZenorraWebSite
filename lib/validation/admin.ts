@@ -100,5 +100,6 @@ export const testimonialInputSchema = z.object({
 export const userInviteSchema = z.object({
   email: z.string().trim().toLowerCase().email("Enter a valid email address."),
   name: z.string().trim().min(1, "Enter a name.").max(80),
-  role: z.enum(["SUPER_ADMIN", "ADMINISTRATOR", "EDITOR", "ADVISOR", "VIEWER"]),
+  role: z.enum(["SUPER_ADMIN", "ADMINISTRATOR", "EDITOR", "ADVISOR", "VIEWER", "PARTNER"]),
+  partnerId: z.string().trim().max(40).optional(),
 });

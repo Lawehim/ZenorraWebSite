@@ -55,6 +55,8 @@ export async function savePartner(actor: Actor, id: string | null, input: unknow
 
 export async function deletePartner(actor: Actor, id: string) {
   assertCan(actor.role, "testimonials.manage");
-  await db.partner.delete({ where: { id } });
+  const users = await db.user.count({ where: { partnerId: id, status: { not: "REMOVED" } } });
+  if (users) throw new Error("This partner still has partner-portal users. Remove them under Users & roles first.");
+  await db.$transaction([db.property.updateMany({ where: { partnerId: id }, data: { partnerId: null } }), db.user.updateMany({ where: { partnerId: id }, data: { partnerId: null } }), db.partner.delete({ where: { id } })]);
   await audit(actor, "partner.delete", "Partner", id);
 }

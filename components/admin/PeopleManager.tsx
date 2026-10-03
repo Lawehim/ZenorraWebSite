@@ -135,7 +135,10 @@ function PartnerRow({ item, images }: { item: Partner | null; images: Img[] }) {
           Save
         </button>
         {item && (
-          <button type="button" className="btn btn-danger btn-sm" disabled={pending} onClick={() => confirm(`Remove ${item.name}?`) && start(() => deletePartnerAction(item.id))}>
+          <button type="button" className="btn btn-danger btn-sm" disabled={pending} onClick={() => confirm(`Remove ${item.name}?`) && start(async () => {
+                const r = await deletePartnerAction(item.id);
+                if (!r.ok && r.message) alert(r.message);
+              })}>
             Remove
           </button>
         )}

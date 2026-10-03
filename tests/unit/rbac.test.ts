@@ -28,8 +28,9 @@ const MATRIX: Record<Capability, Role[]> = {
   "buyers.manage": ["SUPER_ADMIN", "ADMINISTRATOR"],
   "buyers.view": ["SUPER_ADMIN", "ADMINISTRATOR", "ADVISOR"],
   "reports.view": ["SUPER_ADMIN", "ADMINISTRATOR", "VIEWER"],
+  "partner.portal": ["PARTNER"],
 };
-const ROLES: Role[] = ["SUPER_ADMIN", "ADMINISTRATOR", "EDITOR", "ADVISOR", "VIEWER"];
+const ROLES: Role[] = ["SUPER_ADMIN", "ADMINISTRATOR", "EDITOR", "ADVISOR", "VIEWER", "PARTNER"];
 
 describe("RBAC permission map (FR-ADM-051)", () => {
   it("covers every capability in the matrix and no others", () => {

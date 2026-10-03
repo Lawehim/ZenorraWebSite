@@ -32,6 +32,8 @@ const PERMISSIONS = {
   "buyers.manage": ADMINS,
   "buyers.view": [...ADMINS, "ADVISOR"],
   "reports.view": [...ADMINS, "VIEWER"],
+  // Partner developers: read-only figures for their own estates, nothing else (SRS §3 Phase 3, A-6)
+  "partner.portal": ["PARTNER"],
 } satisfies Record<string, Role[]>;
 
 export type Capability = keyof typeof PERMISSIONS;
@@ -58,4 +60,10 @@ export const ROLE_LABELS: Record<Role, string> = {
   EDITOR: "Editor",
   ADVISOR: "Advisor",
   VIEWER: "Viewer",
+  PARTNER: "Partner developer",
 };
+
+/** Where a signed-in user belongs: partner developers never see the staff admin. */
+export function homePathFor(role: Role): "/partner" | "/admin" {
+  return role === "PARTNER" ? "/partner" : "/admin";
+}

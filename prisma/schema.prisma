@@ -17,6 +17,7 @@ enum Role {
   EDITOR
   ADVISOR
   VIEWER
+  PARTNER // partner developer — read-only view of their own estates (Phase 3)
 }
 
 enum UserStatus {
@@ -27,38 +28,40 @@ enum UserStatus {
 }
 
 model User {
-  id             String     @id @default(cuid())
-  email          String     @unique
-  name           String
-  passwordHash   String?
-  role           Role       @default(VIEWER)
-  status         UserStatus @default(INVITED)
-  twoFactorSecret String?
-  twoFactorEnabled Boolean  @default(false)
-  failedLogins   Int        @default(0)
+  id                String     @id @default(cuid())
+  email             String     @unique
+  name              String
+  passwordHash      String?
+  role              Role       @default(VIEWER)
+  status            UserStatus @default(INVITED)
+  twoFactorSecret   String?
+  twoFactorEnabled  Boolean    @default(false)
+  failedLogins      Int        @default(0)
   failedWindowStart DateTime?
-  lockedUntil    DateTime?
-  inviteToken    String?    @unique
-  inviteExpires  DateTime?
-  lastLoginAt    DateTime?
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
+  lockedUntil       DateTime?
+  inviteToken       String?    @unique
+  inviteExpires     DateTime?
+  lastLoginAt       DateTime?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
 
-  sessions   Session[]
+  sessions     Session[]
   chatMessages ChatMessage[]
-  posts      Post[]
-  auditLogs  AuditLog[]
-  activities LeadActivity[]
-  leads      Lead[]         @relation("assignedLeads")
+  posts        Post[]
+  auditLogs    AuditLog[]
+  activities   LeadActivity[]
+  leads        Lead[]         @relation("assignedLeads")
+  partnerId    String?
+  partner      Partner?       @relation(fields: [partnerId], references: [id])
 }
 
 model Session {
-  id         String   @id @default(cuid())
-  tokenHash  String   @unique
+  id         String    @id @default(cuid())
+  tokenHash  String    @unique
   userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt  DateTime @default(now())
-  lastSeenAt DateTime @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now())
+  lastSeenAt DateTime  @default(now())
   expiresAt  DateTime
   revokedAt  DateTime?
   ip         String?
@@ -134,21 +137,23 @@ model Property {
   leads     Lead[]
   bookings  Booking[]
   purchases Purchase[]
+  partnerId String?
+  partner   Partner?           @relation(fields: [partnerId], references: [id])
 
   @@index([status, corridor, priceNaira])
 }
 
 model PropertyPhase {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   propertyId     String
-  property       Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  property       Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   name           String
   priceNaira     BigInt
-  plotsTotal     Int      @default(0)
-  plotsAvailable Int      @default(0)
-  status         String   @default("SELLING")
+  plotsTotal     Int       @default(0)
+  plotsAvailable Int       @default(0)
+  status         String    @default("SELLING")
   opensAt        DateTime?
-  order          Int      @default(0)
+  order          Int       @default(0)
 }
 
 model PropertyMedia {
@@ -191,28 +196,28 @@ model Category {
 }
 
 model Post {
-  id             String     @id @default(cuid())
-  slug           String     @unique
-  title          String
-  excerpt        String?
-  body           Json?
-  bodyHtml       String?
-  categoryId     String?
-  category       Category?  @relation(fields: [categoryId], references: [id])
-  authorId       String?
-  author         User?      @relation(fields: [authorId], references: [id])
-  authorName     String?
-  coverMediaId   String?
-  coverMedia     MediaAsset? @relation(fields: [coverMediaId], references: [id])
-  status         PostStatus @default(DRAFT)
-  publishedAt    DateTime?
-  readingMinutes Int?
-  readingOverride Boolean   @default(false)
-  seoTitle       String?
-  seoDescription String?
-  deletedAt      DateTime?
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
+  id              String      @id @default(cuid())
+  slug            String      @unique
+  title           String
+  excerpt         String?
+  body            Json?
+  bodyHtml        String?
+  categoryId      String?
+  category        Category?   @relation(fields: [categoryId], references: [id])
+  authorId        String?
+  author          User?       @relation(fields: [authorId], references: [id])
+  authorName      String?
+  coverMediaId    String?
+  coverMedia      MediaAsset? @relation(fields: [coverMediaId], references: [id])
+  status          PostStatus  @default(DRAFT)
+  publishedAt     DateTime?
+  readingMinutes  Int?
+  readingOverride Boolean     @default(false)
+  seoTitle        String?
+  seoDescription  String?
+  deletedAt       DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 
   revisions PostRevision[]
 
@@ -242,17 +247,24 @@ model MediaAsset {
   focalX      Float?
   focalY      Float?
   derivatives Json?
+  // Video (FR-ADM-028): QUEUED | PROCESSING | READY | FAILED; null for images and documents
+  videoStatus String?
+  videoError  String?
+  durationSec Float?
+  posterKey   String?
+  sourceKey   String?
   uploadedBy  String?
   deletedAt   DateTime?
   createdAt   DateTime  @default(now())
 
-  propertyMedia PropertyMedia[]
-  documents     PropertyDocument[]
-  posts         Post[]
-  testimonials  Testimonial[]
-  teamMembers   TeamMember[]
-  partners      Partner[]
-  buyerDocuments BuyerDocument[]
+  propertyMedia     PropertyMedia[]
+  documents         PropertyDocument[]
+  posts             Post[]
+  testimonials      Testimonial[]
+  testimonialVideos Testimonial[]      @relation("testimonialVideo")
+  teamMembers       TeamMember[]
+  partners          Partner[]
+  buyerDocuments    BuyerDocument[]
 }
 
 enum LeadStatus {
@@ -265,45 +277,45 @@ enum LeadStatus {
 }
 
 model Lead {
-  id              String     @id @default(cuid())
-  reference       String     @unique
-  name            String
-  phoneE164       String?
-  email           String?
-  objective       String?
-  corridors       String[]   @default([])
-  budgetBand      String?
-  timeline        String?
-  residency       String?
-  note            String?
-  enquiryType     String?
-  propertyId      String?
-  property        Property?  @relation(fields: [propertyId], references: [id])
-  source          String
-  status          LeadStatus @default(NEW)
-  score           Int?
-  assignedToId    String?
-  assignedTo      User?      @relation("assignedLeads", fields: [assignedToId], references: [id])
-  utm             Json?
-  landingPath     String?
-  pagePath        String?
-  referrer        String?
-  deviceClass     String?
-  marketingConsent Boolean   @default(false)
-  disposableEmail Boolean    @default(false)
-  readAt          DateTime?
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
-  lastContactedAt DateTime?
+  id                 String     @id @default(cuid())
+  reference          String     @unique
+  name               String
+  phoneE164          String?
+  email              String?
+  objective          String?
+  corridors          String[]   @default([])
+  budgetBand         String?
+  timeline           String?
+  residency          String?
+  note               String?
+  enquiryType        String?
+  propertyId         String?
+  property           Property?  @relation(fields: [propertyId], references: [id])
+  source             String
+  status             LeadStatus @default(NEW)
+  score              Int?
+  assignedToId       String?
+  assignedTo         User?      @relation("assignedLeads", fields: [assignedToId], references: [id])
+  utm                Json?
+  landingPath        String?
+  pagePath           String?
+  referrer           String?
+  deviceClass        String?
+  marketingConsent   Boolean    @default(false)
+  disposableEmail    Boolean    @default(false)
+  readAt             DateTime?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  lastContactedAt    DateTime?
   // Phase 2
-  isPartial        Boolean   @default(false)
-  callbackWindow   String?
-  whatsappOptIn    Boolean   @default(false)
+  isPartial          Boolean    @default(false)
+  callbackWindow     String?
+  whatsappOptIn      Boolean    @default(false)
   firstResponseDueAt DateTime?
-  escalatedAt      DateTime?
-  channelInvalid   String[]  @default([])
+  escalatedAt        DateTime?
+  channelInvalid     String[]   @default([])
   // Phase 3
-  referralCode     String?
+  referralCode       String?
 
   activities LeadActivity[]
   consents   Consent[]
@@ -394,6 +406,8 @@ model Testimonial {
   mediaAssetId String?
   mediaAsset   MediaAsset? @relation(fields: [mediaAssetId], references: [id])
   videoUrl     String?
+  videoAssetId String?
+  videoAsset   MediaAsset? @relation("testimonialVideo", fields: [videoAssetId], references: [id])
   order        Int         @default(0)
   published    Boolean     @default(true)
   createdAt    DateTime    @default(now())
@@ -449,18 +463,18 @@ enum NotificationStatus {
 
 // Outbox for email/SMS/WhatsApp. A lead is always persisted before a row lands here.
 model Notification {
-  id          String             @id @default(cuid())
-  channel     String
-  to          String
-  template    String
-  payload     Json
-  status      NotificationStatus @default(QUEUED)
-  attempts    Int                @default(0)
-  nextAttemptAt DateTime         @default(now())
-  lastError   String?
-  leadId      String?
-  createdAt   DateTime           @default(now())
-  sentAt      DateTime?
+  id            String             @id @default(cuid())
+  channel       String
+  to            String
+  template      String
+  payload       Json
+  status        NotificationStatus @default(QUEUED)
+  attempts      Int                @default(0)
+  nextAttemptAt DateTime           @default(now())
+  lastError     String?
+  leadId        String?
+  createdAt     DateTime           @default(now())
+  sentAt        DateTime?
 
   @@index([status, nextAttemptAt])
 }
@@ -531,6 +545,9 @@ model Partner {
   mediaAsset   MediaAsset? @relation(fields: [mediaAssetId], references: [id])
   order        Int         @default(0)
   published    Boolean     @default(true)
+
+  properties Property[]
+  users      User[]
 }
 
 // ======================================================================
@@ -544,27 +561,27 @@ enum BuyerStatus {
 }
 
 model Buyer {
-  id            String          @id @default(cuid())
-  leadId        String?         @unique
-  lead          Lead?           @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  id            String      @id @default(cuid())
+  leadId        String?     @unique
+  lead          Lead?       @relation(fields: [leadId], references: [id], onDelete: SetNull)
   name          String
-  phoneE164     String?         @unique
-  email         String?         @unique
+  phoneE164     String?     @unique
+  email         String?     @unique
   passwordHash  String?
-  referralCode  String          @unique
-  status        BuyerStatus     @default(INVITED)
-  inviteToken   String?         @unique
+  referralCode  String      @unique
+  status        BuyerStatus @default(INVITED)
+  inviteToken   String?     @unique
   inviteExpires DateTime?
-  createdAt     DateTime        @default(now())
+  createdAt     DateTime    @default(now())
   lastLoginAt   DateTime?
 
-  sessions   BuyerSession[]
-  otps       BuyerOtp[]
-  purchases  Purchase[]
-  documents  BuyerDocument[]
-  referrals  Referral[]       @relation("referrer")
-  tickets    SupportTicket[]
-  shortlist  ShortlistItem[]
+  sessions  BuyerSession[]
+  otps      BuyerOtp[]
+  purchases Purchase[]
+  documents BuyerDocument[]
+  referrals Referral[]      @relation("referrer")
+  tickets   SupportTicket[]
+  shortlist ShortlistItem[]
 }
 
 model BuyerSession {
@@ -593,21 +610,21 @@ model BuyerOtp {
 }
 
 model Purchase {
-  id           String       @id @default(cuid())
-  reference    String       @unique
-  buyerId      String
-  buyer        Buyer        @relation(fields: [buyerId], references: [id], onDelete: Cascade)
-  propertyId   String
-  property     Property     @relation(fields: [propertyId], references: [id])
-  phaseName    String?
-  plotNumber   String?
-  sizeText     String?
-  priceKobo    BigInt
-  depositKobo  BigInt
-  planMonths   Int
-  allocationStatus String   @default("PENDING") // PENDING | ALLOCATED
-  allocatedAt  DateTime?
-  createdAt    DateTime     @default(now())
+  id               String    @id @default(cuid())
+  reference        String    @unique
+  buyerId          String
+  buyer            Buyer     @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  propertyId       String
+  property         Property  @relation(fields: [propertyId], references: [id])
+  phaseName        String?
+  plotNumber       String?
+  sizeText         String?
+  priceKobo        BigInt
+  depositKobo      BigInt
+  planMonths       Int
+  allocationStatus String    @default("PENDING") // PENDING | ALLOCATED
+  allocatedAt      DateTime?
+  createdAt        DateTime  @default(now())
 
   instalments Instalment[]
   documents   BuyerDocument[]
@@ -622,17 +639,17 @@ enum InstalmentStatus {
 }
 
 model Instalment {
-  id          String           @id @default(cuid())
-  purchaseId  String
-  purchase    Purchase         @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
-  sequence    Int
-  label       String
-  dueDate     DateTime         @db.Date
-  amountKobo  BigInt
-  paidKobo    BigInt           @default(0)
-  status      InstalmentStatus @default(DUE)
-  remindersSent String[]       @default([])
-  payments    Payment[]
+  id            String           @id @default(cuid())
+  purchaseId    String
+  purchase      Purchase         @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  sequence      Int
+  label         String
+  dueDate       DateTime         @db.Date
+  amountKobo    BigInt
+  paidKobo      BigInt           @default(0)
+  status        InstalmentStatus @default(DUE)
+  remindersSent String[]         @default([])
+  payments      Payment[]
 
   @@unique([purchaseId, sequence])
 }
@@ -645,21 +662,21 @@ enum PaymentStatus {
 }
 
 model Payment {
-  id           String        @id @default(cuid())
-  instalmentId String
-  instalment   Instalment    @relation(fields: [instalmentId], references: [id], onDelete: Cascade)
-  provider     String // paystack | offline
-  providerRef  String        @unique
-  amountKobo   BigInt
-  status       PaymentStatus @default(PENDING)
-  method       String?
-  reasonCode   String?
-  evidenceRef  String?
-  recordedById String?
-  receiptNumber String?      @unique
-  rawWebhook   Json?
-  createdAt    DateTime      @default(now())
-  paidAt       DateTime?
+  id            String        @id @default(cuid())
+  instalmentId  String
+  instalment    Instalment    @relation(fields: [instalmentId], references: [id], onDelete: Cascade)
+  provider      String // paystack | offline
+  providerRef   String        @unique
+  amountKobo    BigInt
+  status        PaymentStatus @default(PENDING)
+  method        String?
+  reasonCode    String?
+  evidenceRef   String?
+  recordedById  String?
+  receiptNumber String?       @unique
+  rawWebhook    Json?
+  createdAt     DateTime      @default(now())
+  paidAt        DateTime?
 }
 
 model BuyerDocument {
@@ -684,41 +701,41 @@ enum ReferralStatus {
 }
 
 model Referral {
-  id              String         @id @default(cuid())
-  referrerId      String
-  referrer        Buyer          @relation("referrer", fields: [referrerId], references: [id], onDelete: Cascade)
-  referredLeadId  String         @unique
-  referredLead    Lead           @relation(fields: [referredLeadId], references: [id], onDelete: Cascade)
-  purchaseId      String?        @unique
-  purchase        Purchase?      @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
-  status          ReferralStatus @default(PENDING)
-  commissionKobo  BigInt         @default(0)
-  approvedById    String?
-  paidAt          DateTime?
-  createdAt       DateTime       @default(now())
+  id             String         @id @default(cuid())
+  referrerId     String
+  referrer       Buyer          @relation("referrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  referredLeadId String         @unique
+  referredLead   Lead           @relation(fields: [referredLeadId], references: [id], onDelete: Cascade)
+  purchaseId     String?        @unique
+  purchase       Purchase?      @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
+  status         ReferralStatus @default(PENDING)
+  commissionKobo BigInt         @default(0)
+  approvedById   String?
+  paidAt         DateTime?
+  createdAt      DateTime       @default(now())
 }
 
 model SupportTicket {
-  id         String   @id @default(cuid())
-  reference  String   @unique
+  id         String    @id @default(cuid())
+  reference  String    @unique
   buyerId    String
-  buyer      Buyer    @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  buyer      Buyer     @relation(fields: [buyerId], references: [id], onDelete: Cascade)
   purchaseId String?
   purchase   Purchase? @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
   subject    String
   body       String
-  status     String   @default("OPEN") // OPEN | ANSWERED | CLOSED
+  status     String    @default("OPEN") // OPEN | ANSWERED | CLOSED
   reply      String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 }
 
 model ShortlistItem {
-  id         String   @id @default(cuid())
-  buyerId    String
-  buyer      Buyer    @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  id           String   @id @default(cuid())
+  buyerId      String
+  buyer        Buyer    @relation(fields: [buyerId], references: [id], onDelete: Cascade)
   propertySlug String
-  createdAt  DateTime @default(now())
+  createdAt    DateTime @default(now())
 
   @@unique([buyerId, propertySlug])
 }

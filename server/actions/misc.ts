@@ -33,7 +33,13 @@ export async function inviteUserAction(data: Record<string, unknown>) {
   const actor = await requireActor("users.manage");
   const parsed = userInviteSchema.safeParse(data);
   if (!parsed.success) return { ok: false as const, errors: fieldErrors(parsed.error) };
-  const { token } = await inviteUser(actor, parsed.data);
+  let token: string;
+  try {
+    ({ token } = await inviteUser(actor, parsed.data));
+  } catch (e) {
+    if (e instanceof Error && /partner/i.test(e.message)) return { ok: false as const, errors: { [parsed.data.role === "PARTNER" ? "partnerId" : "email"]: e.message } as Record<string, string> };
+    throw e;
+  }
   processQueueSoon();
   revalidatePath("/admin/users");
   // The link is also shown once to the inviter, so onboarding works before email is configured.

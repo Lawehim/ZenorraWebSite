@@ -88,7 +88,7 @@ export async function signIn(emailRaw: string, password: string, ctx: RequestCtx
   return { ok: true, token, user };
 }
 
-export type SessionUser = Pick<User, "id" | "email" | "name" | "role" | "twoFactorEnabled"> & { sessionExpiresAt: Date };
+export type SessionUser = Pick<User, "id" | "email" | "name" | "role" | "twoFactorEnabled" | "partnerId"> & { sessionExpiresAt: Date };
 
 export async function getSessionUser(token: string | undefined, ctx: RequestCtx = {}): Promise<SessionUser | null> {
   if (!token) return null;
@@ -99,8 +99,8 @@ export async function getSessionUser(token: string | undefined, ctx: RequestCtx 
   if (now.getTime() - session.lastSeenAt.getTime() > IDLE_MINUTES * 60_000) return null;
   if (session.user.status !== "ACTIVE") return null;
   await db.session.update({ where: { id: session.id }, data: { lastSeenAt: now } });
-  const { id, email, name, role, twoFactorEnabled } = session.user;
-  return { id, email, name, role, twoFactorEnabled, sessionExpiresAt: new Date(Math.min(session.expiresAt.getTime(), now.getTime() + IDLE_MINUTES * 60_000)) };
+  const { id, email, name, role, twoFactorEnabled, partnerId } = session.user;
+  return { id, email, name, role, twoFactorEnabled, partnerId, sessionExpiresAt: new Date(Math.min(session.expiresAt.getTime(), now.getTime() + IDLE_MINUTES * 60_000)) };
 }
 
 export async function signOut(token: string) {
@@ -131,17 +131,24 @@ function guardRoleChange(actor: Actor, role: Role) {
   if (role === "SUPER_ADMIN" && actor.role !== "SUPER_ADMIN") throw new ForbiddenError("users.manage");
 }
 
-export async function inviteUser(actor: Actor, input: { email: string; name: string; role: Role }, now: Date = new Date()) {
+const PARTNER_SWITCH = "Partner developer accounts are separate from staff accounts — invite a new user instead.";
+
+export async function inviteUser(actor: Actor, input: { email: string; name: string; role: Role; partnerId?: string | null }, now: Date = new Date()) {
   guardRoleChange(actor, input.role);
-  const token = crypto.randomBytes(24).toString("base64url");
+  const isPartner = input.role === "PARTNER";
+  if (isPartner && !(input.partnerId && (await db.partner.findUnique({ where: { id: input.partnerId } })))) throw new Error("Choose which partner developer this person works for.");
   const email = input.email.trim().toLowerCase();
+  const existing = await db.user.findUnique({ where: { email } });
+  if (existing && (existing.role === "PARTNER") !== isPartner) throw new Error(PARTNER_SWITCH);
+  const token = crypto.randomBytes(24).toString("base64url");
+  const partnerId = isPartner ? input.partnerId! : null;
   const user = await db.user.upsert({
     where: { email },
-    create: { email, name: input.name, role: input.role, status: "INVITED", inviteToken: sha(token), inviteExpires: new Date(now.getTime() + INVITE_HOURS * 3600_000) },
-    update: { name: input.name, role: input.role, status: "INVITED", inviteToken: sha(token), inviteExpires: new Date(now.getTime() + INVITE_HOURS * 3600_000) },
+    create: { email, name: input.name, role: input.role, partnerId, status: "INVITED", inviteToken: sha(token), inviteExpires: new Date(now.getTime() + INVITE_HOURS * 3600_000) },
+    update: { name: input.name, role: input.role, partnerId, status: "INVITED", inviteToken: sha(token), inviteExpires: new Date(now.getTime() + INVITE_HOURS * 3600_000) },
   });
   await enqueue({ channel: "email", to: email, template: "auth.invite", payload: { name: input.name, token, invitedBy: actor.name ?? actor.email ?? "" } });
-  await audit(actor, "user.invite", "User", user.id, { after: { email, role: input.role } });
+  await audit(actor, "user.invite", "User", user.id, { after: { email, role: input.role, partnerId } });
   return { user, token };
 }
 
@@ -160,6 +167,7 @@ export async function changeUserRole(actor: Actor, userId: string, role: Role) {
   guardRoleChange(actor, role);
   const before = await db.user.findUniqueOrThrow({ where: { id: userId } });
   if (before.role === "SUPER_ADMIN" && actor.role !== "SUPER_ADMIN") throw new ForbiddenError("users.manage");
+  if ((before.role === "PARTNER") !== (role === "PARTNER")) throw new Error(PARTNER_SWITCH);
   await db.user.update({ where: { id: userId }, data: { role } });
   await revokeAll(userId);
   await audit(actor, "user.role", "User", userId, { before: { role: before.role }, after: { role } });

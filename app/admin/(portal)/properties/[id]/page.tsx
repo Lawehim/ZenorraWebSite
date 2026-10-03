@@ -7,6 +7,7 @@ import { pickDerivative } from "@/server/services/media";
 import { PropertyForm, type PropertyDraft } from "@/components/admin/PropertyForm";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { PropertyDocuments } from "@/components/admin/PropertyDocuments";
+import { PropertyPartnerSelect } from "@/components/admin/PropertyPartnerSelect";
 
 export const metadata = { title: "Edit property" };
 
@@ -19,6 +20,7 @@ export default async function EditProperty({ params }: { params: Promise<{ id: s
   if (!isNew && !p) notFound();
   const assets = await db.mediaAsset.findMany({ where: { deletedAt: null, mimeType: { startsWith: "image/" } }, orderBy: { createdAt: "desc" }, take: 300 });
   const count = await db.property.count();
+  const partners = await db.partner.findMany({ where: { kind: "DEVELOPER" }, orderBy: { name: "asc" }, select: { id: true, name: true } });
 
   const initial: PropertyDraft = {
     name: p?.name ?? "",
@@ -70,6 +72,7 @@ export default async function EditProperty({ params }: { params: Promise<{ id: s
         selectedMedia={p?.media.map((m) => m.mediaAssetId) ?? []}
         assets={assets.map((a) => ({ id: a.id, filename: a.filename, alt: a.alt, thumb: `/media/${pickDerivative(a.derivatives, 400)?.key ?? a.key}` }))}
       />
+      {p && <PropertyPartnerSelect propertyId={p.id} partners={partners} value={p.partnerId} canEdit={can(user.role, "properties.publish")} />}
       {p && <PropertyDocuments propertyId={p.id} library={pdfs} docs={p.documents.map((d) => ({ id: d.id, label: d.label, kind: d.kind, isPublic: d.isPublic, filename: d.mediaAsset.filename }))} />}
     </>
   );

@@ -9,7 +9,10 @@ export const metadata = { title: "Users & roles" };
 
 export default async function UsersAdmin() {
   const me = await requirePageUser("users.manage", "/admin/users");
-  const users = await db.user.findMany({ orderBy: [{ status: "asc" }, { name: "asc" }] });
+  const [users, partners] = await Promise.all([
+    db.user.findMany({ orderBy: [{ status: "asc" }, { name: "asc" }], include: { partner: { select: { name: true } } } }),
+    db.partner.findMany({ orderBy: [{ kind: "asc" }, { name: "asc" }], select: { id: true, name: true } }),
+  ]);
   return (
     <>
       <div className="adm-head">
@@ -21,6 +24,7 @@ export default async function UsersAdmin() {
       <UsersManager
         meId={me.id}
         meRole={me.role}
+        partners={partners}
         users={users.map((u) => ({
           id: u.id,
           name: u.name,
@@ -31,6 +35,7 @@ export default async function UsersAdmin() {
           locked: Boolean(u.lockedUntil && u.lockedUntil > new Date()),
           twoFactor: u.twoFactorEnabled,
           lastLogin: u.lastLoginAt ? formatDateTimeLagos(u.lastLoginAt) : "Never",
+          partnerName: u.partner?.name ?? null,
         }))}
       />
       <details className="card" style={{ marginTop: "1.4rem" }}>
@@ -52,6 +57,9 @@ export default async function UsersAdmin() {
           </li>
           <li>
             <b>Viewer</b> — read-only dashboard and leads.
+          </li>
+          <li>
+            <b>Partner developer</b> — an outside account for a developer whose estates Zenorra markets. Signs in to a separate read-only portal showing enquiry, inspection and sales figures for their own estates only — no buyer names or contact details, and no access to this admin.
           </li>
         </ul>
       </details>

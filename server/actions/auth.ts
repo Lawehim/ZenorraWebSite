@@ -13,7 +13,7 @@ export interface AuthState {
 
 function safeNext(next: FormDataEntryValue | null): string {
   const n = typeof next === "string" ? next : "";
-  return n.startsWith("/admin") && !n.startsWith("//") ? n : "/admin";
+  return (n.startsWith("/admin") || n.startsWith("/partner")) && !n.startsWith("//") ? n : "/admin";
 }
 
 export async function signInAction(_prev: AuthState, form: FormData): Promise<AuthState> {

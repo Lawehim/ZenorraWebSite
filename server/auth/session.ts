@@ -20,8 +20,17 @@ export function toActor(u: SessionUser): Actor {
 export async function requirePageUser(capability: Capability = "dashboard.view", nextPath?: string): Promise<SessionUser> {
   const u = await currentUser();
   if (!u) redirect(`/admin/login${nextPath ? `?next=${encodeURIComponent(nextPath)}` : ""}`);
+  if (u.role === "PARTNER") redirect("/partner"); // partner developers never see the staff admin
   if (!can(u.role, capability)) redirect("/admin?denied=1");
   return u;
+}
+
+/** For partner-developer pages: their own partner id comes from the session, never the URL. */
+export async function requirePartnerUser(): Promise<SessionUser & { partnerId: string }> {
+  const u = await currentUser();
+  if (!u) redirect("/admin/login?next=%2Fpartner");
+  if (u.role !== "PARTNER" || !can(u.role, "partner.portal") || !u.partnerId) redirect("/admin");
+  return { ...u, partnerId: u.partnerId };
 }
 
 /** For server actions / route handlers: throw, and audit the attempt (NFR-SEC-008, TC-SEC-004). */
