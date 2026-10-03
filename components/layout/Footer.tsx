@@ -6,7 +6,7 @@ import { NewsletterForm } from "@/components/forms/NewsletterForm";
 import { OpenModalButton } from "./SiteProvider";
 import { CookiePreferencesLink } from "./ConsentBanner";
 
-const SOCIAL_LABELS: Record<string, string> = { instagram: "Instagram", facebook: "Facebook", tiktok: "TikTok", linkedin: "LinkedIn", x: "X (Twitter)" };
+const SOCIAL_LABELS: Record<string, string> = { instagram: "Instagram", facebook: "Facebook", tiktok: "TikTok", linkedin: "LinkedIn", youtube: "YouTube", x: "X (Twitter)" };
 
 export function Footer({ settings, copy }: { settings: SiteSettings; copy: ContentOf<"site.footer"> }) {
   const socials = Object.entries(settings.social).filter(([, url]) => url);

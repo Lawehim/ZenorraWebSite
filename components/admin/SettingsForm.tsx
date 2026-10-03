@@ -6,6 +6,8 @@ import { Field } from "@/components/ui/Field";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
+const SOCIAL_LABELS = { instagram: "Instagram", facebook: "Facebook", tiktok: "TikTok", linkedin: "LinkedIn", youtube: "YouTube", x: "X (Twitter)" } as const;
+
 export function SettingsForm({ initial }: { initial: SiteSettings }) {
   const [s, setS] = useState(initial);
   const [points, setPoints] = useState(initial.departurePoints.join("\n"));
@@ -57,8 +59,8 @@ export function SettingsForm({ initial }: { initial: SiteSettings }) {
             <Field label="Google reviews link" error={errors.googleReviewsUrl}>
               {(p) => <input {...p} className="inp" value={s.googleReviewsUrl} onChange={(e) => setS({ ...s, googleReviewsUrl: e.target.value })} />}
             </Field>
-            {(["instagram", "facebook", "tiktok", "linkedin", "x"] as const).map((k) => (
-              <Field key={k} label={k === "x" ? "X (Twitter)" : k[0].toUpperCase() + k.slice(1)} help="Full https:// link, or leave empty to hide the icon." error={errors.social}>
+            {(["instagram", "facebook", "tiktok", "linkedin", "youtube", "x"] as const).map((k) => (
+              <Field key={k} label={SOCIAL_LABELS[k]} help="Full https:// link, or leave empty to hide the icon." error={errors.social}>
                 {(p) => <input {...p} className="inp" value={s.social[k]} onChange={(e) => setS({ ...s, social: { ...s.social, [k]: e.target.value } })} />}
               </Field>
             ))}
