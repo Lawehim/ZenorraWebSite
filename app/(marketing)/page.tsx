@@ -15,6 +15,7 @@ import { Icon } from "@/components/ui/Icon";
 import { Button } from "@/components/ui/Button";
 import { OpenModalButton } from "@/components/layout/SiteProvider";
 import { Eyebrow, SectionHead, CheckList, CtaBand, FeatureGrid, JourneySteps, Paragraphs } from "@/components/sections";
+import { HeroVideo } from "@/components/marketing/HeroVideo";
 
 export const revalidate = 60;
 
@@ -37,6 +38,7 @@ export default async function HomePage() {
       <section className="hero">
         <div className="hero-bg">
           <SiteImage image={imageFromUrl(hero.image, assets, hero.imageBrief)} brief={hero.imageBrief} meta="1920×1080 min" full priority />
+          {hero.video && <HeroVideo src={hero.video} />}
         </div>
         <div className="hero-veil" />
         <div className="wrap">

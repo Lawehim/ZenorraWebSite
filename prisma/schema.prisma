@@ -257,14 +257,13 @@ model MediaAsset {
   deletedAt   DateTime?
   createdAt   DateTime  @default(now())
 
-  propertyMedia     PropertyMedia[]
-  documents         PropertyDocument[]
-  posts             Post[]
-  testimonials      Testimonial[]
-  testimonialVideos Testimonial[]      @relation("testimonialVideo")
-  teamMembers       TeamMember[]
-  partners          Partner[]
-  buyerDocuments    BuyerDocument[]
+  propertyMedia  PropertyMedia[]
+  documents      PropertyDocument[]
+  posts          Post[]
+  testimonials   Testimonial[]
+  teamMembers    TeamMember[]
+  partners       Partner[]
+  buyerDocuments BuyerDocument[]
 }
 
 enum LeadStatus {
@@ -406,8 +405,6 @@ model Testimonial {
   mediaAssetId String?
   mediaAsset   MediaAsset? @relation(fields: [mediaAssetId], references: [id])
   videoUrl     String?
-  videoAssetId String?
-  videoAsset   MediaAsset? @relation("testimonialVideo", fields: [videoAssetId], references: [id])
   order        Int         @default(0)
   published    Boolean     @default(true)
   createdAt    DateTime    @default(now())

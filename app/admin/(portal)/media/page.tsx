@@ -25,6 +25,9 @@ export default async function MediaAdmin({ searchParams }: { searchParams: Promi
           <h1>Media library</h1>
           <p>JPEG, PNG, WebP or AVIF up to 15MB each. Images are resized automatically and location data is removed.</p>
         </div>
+        <Link className="btn btn-line btn-sm" href="/admin/media/videos">
+          Videos →
+        </Link>
       </div>
       <form className="toolbar-row" role="search">
         <div className="field">

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { usePrefersReducedMotion } from "@/components/hooks/usePrefersReducedMotion";
+import { isUploadedVideoUrl, posterUrlFor } from "@/lib/media/video";
 
 export interface TestimonialItem {
   id: string;
@@ -61,9 +62,13 @@ export function TestimonialCarousel({ items }: { items: TestimonialItem[] }) {
                 <span>{t.roleText}</span>
               </div>
             </figcaption>
-            {t.videoUrl && embedUrl(t.videoUrl) && (
+            {t.videoUrl && (isUploadedVideoUrl(t.videoUrl) || embedUrl(t.videoUrl)) && (
               playing === t.id ? (
-                <iframe className="video-frame" src={embedUrl(t.videoUrl)!} title={`Video testimonial from ${t.name}`} allow="autoplay; encrypted-media; fullscreen" allowFullScreen />
+                isUploadedVideoUrl(t.videoUrl) ? (
+                  <video className="video-frame" src={t.videoUrl} poster={posterUrlFor(t.videoUrl)} controls autoPlay playsInline preload="metadata" aria-label={`Video testimonial from ${t.name}`} />
+                ) : (
+                  <iframe className="video-frame" src={embedUrl(t.videoUrl)!} title={`Video testimonial from ${t.name}`} allow="autoplay; encrypted-media; fullscreen" allowFullScreen />
+                )
               ) : (
                 <button type="button" className="btn btn-line btn-sm video-btn" onClick={() => { setPaused(true); setPlaying(t.id); }}>
                   ▶ Watch {t.name.split(" ")[0]}&apos;s video

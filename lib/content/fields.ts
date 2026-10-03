@@ -1,8 +1,9 @@
 // Field model for editable content blocks. The admin form is generated from these
 // definitions and the same definitions build the server-side Zod validator.
 import { z } from "zod";
+import { isUploadedVideoUrl } from "@/lib/media/video";
 
-export type FieldType = "text" | "textarea" | "href" | "number" | "select" | "image" | "list" | "items";
+export type FieldType = "text" | "textarea" | "href" | "number" | "select" | "image" | "video" | "list" | "items";
 
 export interface FieldDef {
   name: string;
@@ -23,6 +24,7 @@ const DEFAULT_MAX: Record<FieldType, number> = {
   number: 0,
   select: 0,
   image: 500,
+  video: 200,
   list: 240,
   items: 0,
 };
@@ -52,6 +54,12 @@ export function fieldSchema(f: FieldDef): z.ZodType {
         .trim()
         .max(DEFAULT_MAX.image)
         .refine((v) => v === "" || v.startsWith("/media/") || v.startsWith("/brand/") || /^https:\/\//.test(v), `${f.label} must be an image from the media library.`);
+    case "video":
+      return z
+        .string()
+        .trim()
+        .max(DEFAULT_MAX.video)
+        .refine((v) => v === "" || isUploadedVideoUrl(v), `${f.label} must be a video from Media → Videos.`);
     case "number":
       return z.number({ error: `${f.label} must be a number.` }).finite();
     case "select": {

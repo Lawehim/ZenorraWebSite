@@ -140,7 +140,7 @@ const homeHero = block({
   key: "home.hero",
   page: "Home",
   label: "Hero",
-  fields: [t("eyebrow", "Eyebrow"), t("eyebrowMeta", "Eyebrow detail", { optional: true }), t("headline", "Headline", { max: 120 }), t("headlineAccent", "Headline (gold line)", { max: 80 }), ta("lede", "Supporting text", { max: 400 }), t("primaryLabel", "View properties button", { max: 40 }), t("secondaryLabel", "Book inspection button", { max: 40 }), t("tertiaryLabel", "Advisor link", { max: 40 }), img("image", "Hero image"), brief()],
+  fields: [t("eyebrow", "Eyebrow"), t("eyebrowMeta", "Eyebrow detail", { optional: true }), t("headline", "Headline", { max: 120 }), t("headlineAccent", "Headline (gold line)", { max: 80 }), ta("lede", "Supporting text", { max: 400 }), t("primaryLabel", "View properties button", { max: 40 }), t("secondaryLabel", "Book inspection button", { max: 40 }), t("tertiaryLabel", "Advisor link", { max: 40 }), img("image", "Hero image"), { name: "video", label: "Background video (optional)", type: "video", optional: true, help: "Muted, looping, shown only on wide screens and never to visitors saving data — the hero image is used otherwise and as the poster. Upload in Media → Videos." }, brief()],
   defaults: {
     eyebrow: "Real estate & solar energy",
     eyebrowMeta: "/ Lagos · Ogun · FCT",
@@ -151,6 +151,7 @@ const homeHero = block({
     secondaryLabel: "Book inspection",
     tertiaryLabel: "Talk to an advisor →",
     image: "",
+    video: "",
     imageBrief: "Hero — aerial drone still or 12-second loop",
   },
 });

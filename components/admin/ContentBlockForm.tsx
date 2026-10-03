@@ -4,6 +4,7 @@ import type { BlockDef } from "@/lib/content/registry";
 import type { FieldDef } from "@/lib/content/fields";
 import { Field } from "@/components/ui/Field";
 import { MediaPickerInput } from "./MediaPickerInput";
+import { VideoPickerInput } from "./VideoPickerInput";
 import { useDraftRecovery } from "./useDraftRecovery";
 
 type Draft = Record<string, unknown>;
@@ -123,6 +124,8 @@ function Control({ f, value, error, onChange, path, errors }: ControlProps) {
             );
           case "image":
             return <MediaPickerInput {...p} label={label} value={String(value ?? "")} onChange={onChange} />;
+          case "video":
+            return <VideoPickerInput {...p} label={label} value={String(value ?? "")} onChange={onChange} />;
           default:
             return <input {...p} aria-label={label} className="inp" maxLength={f.max} value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} />;
         }

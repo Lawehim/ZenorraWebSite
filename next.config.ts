@@ -12,7 +12,7 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   // sanitize-html's parser stack ships ESM-only; transpiling it also lets next/jest load it.
   transpilePackages: ["htmlparser2", "domhandler", "domutils", "dom-serializer", "domelementtype", "entities"],
-  serverExternalPackages: ["@node-rs/argon2", "sharp", "embedded-postgres"],
+  serverExternalPackages: ["@node-rs/argon2", "sharp", "embedded-postgres", "@ffmpeg-installer/ffmpeg"],
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },

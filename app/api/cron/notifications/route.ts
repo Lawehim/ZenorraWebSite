@@ -6,6 +6,7 @@ import { purgeUnconfirmed } from "@/server/services/subscribers";
 import { escalateOverdueLeads } from "@/server/services/assignment";
 import { sendInspectionReminders, sendDailyDigest } from "@/server/services/scheduled";
 import { sendPaymentReminders } from "@/server/services/payments";
+import { processQueuedVideos } from "@/server/services/video";
 import { json } from "@/server/http";
 
 export async function GET(req: Request) {
@@ -20,6 +21,8 @@ export async function GET(req: Request) {
     paymentReminders: lagosHour >= 9 && lagosHour < 20 ? await sendPaymentReminders(now) : 0,
     digest: await sendDailyDigest(now),
     purged: (await purgeUnconfirmed(now)).count,
+    // Picks up any video upload whose background transcode was interrupted.
+    videos: await processQueuedVideos(now, 1),
   };
   const delivery = await processQueue(resolveTransport() ?? logTransport, now);
   return json({ ok: true, ...jobs, ...delivery });

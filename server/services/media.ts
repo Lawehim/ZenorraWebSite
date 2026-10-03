@@ -116,7 +116,9 @@ export async function mediaUsage(id: string): Promise<string[]> {
   ]);
   const asset = await db.mediaAsset.findUnique({ where: { id }, select: { key: true } });
   const inContent = asset ? content.filter((c) => JSON.stringify(c.data).includes(`/media/${asset.key}`)).map((c) => `Site content (${c.key})`) : [];
-  return [...props.map((p) => p.property.name), ...posts.map((p) => p.title), ...testimonials.map((t) => `Testimonial: ${t.name}`), ...inContent];
+  const videoIn = asset ? await db.testimonial.findMany({ where: { videoUrl: `/media/${asset.key}` }, select: { name: true } }) : [];
+  const inPosts = asset ? await db.post.findMany({ where: { deletedAt: null, bodyHtml: { contains: `/media/${asset.key}` } }, select: { title: true } }) : [];
+  return [...props.map((p) => p.property.name), ...posts.map((p) => p.title), ...[...testimonials, ...videoIn].map((t) => `Testimonial: ${t.name}`), ...inPosts.map((p) => `Article: ${p.title}`), ...inContent];
 }
 
 export async function deleteMedia(actor: Actor, id: string): Promise<{ ok: true } | { ok: false; message: string }> {

@@ -53,7 +53,9 @@ npm run typecheck
 | Team, partners, categories, shot list, post history | Admin sidebar | About-page team/partners, insight categories, photo shot list, revision diff + restore. |
 | Property documents | Property → Documents | PDF survey/brochure uploads, public or buyer-only. |
 | Buyers, purchases, payments | Admin → Buyers group | Create a purchase with an instalment schedule, invite the buyer, record offline (bank) payments, statements & receipts (PDF), document vault, support tickets, referral approvals. |
-| Bank details, referrals, FX, digest | Admin → Settings | Bank transfer account, referral threshold/commission, indicative GBP/USD/CAD rates, daily digest recipients. |
+| Videos | Admin → Media library → Videos | MP4/MOV/WebM up to 200MB, converted to web MP4 (H.264, max 1280px, fast start) with an automatic poster frame. Use as the homepage hero background (muted loop on wide screens only, never with data saver or reduced motion) or on a testimonial. |
+| Partner developers | Users & roles (role *Partner developer*), property page → Developer | Invite a developer's staff to a separate read-only portal at `/partner` showing enquiries, inspections, sales and collections for their own estates — no buyer names or contact details. |
+| Payment provider, bank details, referrals, FX, digest | Admin → Settings | Bank transfer account, referral threshold/commission, indicative GBP/USD/CAD rates, daily digest recipients. |
 
 Roles follow the SRS RBAC matrix exactly ([`lib/rbac.ts`](lib/rbac.ts)) and are enforced on the server for every action — hidden buttons are a courtesy, not the control.
 
@@ -89,6 +91,8 @@ Messages are written to an outbox table first (a lead is never lost to a provide
 | `TERMII_API_KEY`, `TERMII_SENDER_ID` | Booking SMS via Termii (registered alphanumeric sender) |
 | `CRON_SECRET` | Protects `/api/cron/notifications` — `vercel.json` calls it every 5 minutes (deliveries + retries, lead SLA escalation, inspection & payment reminders 09:00–20:00 WAT, daily digest, purges) |
 | `PAYSTACK_SECRET_KEY` | Buyer card/transfer payments. Register `{APP_URL}/api/webhooks/paystack` in Paystack; the signed webhook (not the browser redirect) marks a payment successful, and is idempotent. Without a key, *Pay now* opens a local simulator (dev only). |
+| `FLW_SECRET_KEY`, `FLW_SECRET_HASH` | Flutterwave, as an alternative to Paystack — pick the provider in **Admin → Settings → Online payments**. Register `{APP_URL}/api/webhooks/flutterwave` and set the same secret hash in the Flutterwave dashboard. A success is only credited when the amount and currency match and Flutterwave's verify API agrees. |
+| `FFMPEG_PATH` | Optional. Video conversion uses the ffmpeg bundled with `@ffmpeg-installer/ffmpeg`; set this to use a system ffmpeg instead. |
 | `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID`, `WHATSAPP_APP_SECRET`, `WHATSAPP_VERIFY_TOKEN` | Two-way WhatsApp via Meta Cloud API. Register `{APP_URL}/api/webhooks/whatsapp`. Inbound messages land in Admin → Live chat; `STOP` opts out. Outbound reminders need Meta-approved templates (e.g. `booking_reminder`). |
 | `APP_URL` | Absolute links in emails, sitemap, structured data |
 
@@ -99,6 +103,5 @@ Without keys, every message is visible in **Admin → Notifications**.
 - **Auth:** self-hosted sessions (hashed opaque tokens in Postgres) instead of Auth.js — same guarantees (Argon2id, TOTP, 8h absolute / 60min idle, immediate revocation, lockout) with fewer moving parts on Next 16.
 - **Redis / R2 / QStash:** replaced locally by Postgres rate-limit counters, local disk media storage and an outbox table. Each sits behind a small module so the production service can be swapped in.
 - **Analytics (GA4/Meta Pixel):** consent banner and storage are implemented; tags are not loaded until IDs are provided.
-- **Video uploads/transcoding (FR-ADM-028):** not built — video testimonials use YouTube/Vimeo embed URLs.
-- **Partner-developer read-only access:** not built; partners are shown on the About page only.
-- **Payments:** Paystack only (no Flutterwave). Money is stored as kobo (BigInt); overpayments carry forward to the next instalment.
+- **Video conversion** runs in the web server process (with a cron fallback for interrupted jobs). That needs a long-running Node host with persistent disk; on serverless hosting move it to a worker and object storage along with the rest of media.
+- **Payments:** Paystack and Flutterwave are both supported; money is stored as kobo (BigInt); overpayments carry forward to the next instalment.

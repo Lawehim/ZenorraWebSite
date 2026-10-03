@@ -2,6 +2,7 @@
 import { useState, useTransition } from "react";
 import { saveTestimonialAction, deleteTestimonialAction } from "@/server/actions/misc";
 import { Field } from "@/components/ui/Field";
+import { VideoPickerInput } from "./VideoPickerInput";
 
 interface Item {
   id: string;
@@ -47,10 +48,11 @@ function Editor({ item, onDone }: { item: Item | null; onDone: () => void }) {
       </Field>
       <div className="two-up">
         <Field label="Position (lower shows first)">{(p) => <input {...p} className="inp" type="number" value={v.order} onChange={(e) => setV({ ...v, order: Number(e.target.value) })} />}</Field>
-        <Field label="Video link (optional)" help="YouTube or Vimeo">
+        <Field label="Video link (optional)" help="YouTube or Vimeo link, or pick an uploaded video below">
           {(p) => <input {...p} className="inp" value={v.videoUrl} onChange={(e) => setV({ ...v, videoUrl: e.target.value })} />}
         </Field>
       </div>
+      <Field label="…or an uploaded video">{(p) => <VideoPickerInput {...p} label="Uploaded video" value={v.videoUrl.startsWith("/media/video/") ? v.videoUrl : ""} onChange={(url) => setV({ ...v, videoUrl: url })} />}</Field>
       <label className="consent">
         <input type="checkbox" checked={v.published} onChange={(e) => setV({ ...v, published: e.target.checked })} /> Show on the website
       </label>
